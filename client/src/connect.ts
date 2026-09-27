@@ -6,6 +6,8 @@ export interface Identity {
   avatar: string | null;
   /** 同一個 roomKey 的人會進同一桌 */
   roomKey: string;
+  /** 認人用：斷線或重新整理後，伺服器靠這個把原本的座位還給你 */
+  userKey: string;
 }
 
 const CLIENT_ID = import.meta.env.VITE_DISCORD_CLIENT_ID as string | undefined;
@@ -46,6 +48,7 @@ export async function getIdentity(): Promise<Identity> {
     avatar: user.avatar ? `https://cdn.discordapp.com/avatars/${user.id}/${user.avatar}.png?size=128` : null,
     // 同一個語音頻道裡開的 Activity 共用同一個 instanceId
     roomKey: sdk.instanceId,
+    userKey: `discord:${user.id}`,
   };
 }
 
@@ -58,7 +61,13 @@ function getLocalIdentity(): Identity {
     sessionStorage.setItem('crazyuno:name', name);
   }
   const roomKey = params.get('room') || 'local';
-  return { name, avatar: null, roomKey };
+  // 存在這個分頁：重新整理還是同一個人，開新分頁就是另一個玩家
+  let userKey = sessionStorage.getItem('crazyuno:key');
+  if (!userKey) {
+    userKey = `tab:${Math.random().toString(36).slice(2)}${Date.now().toString(36)}`;
+    sessionStorage.setItem('crazyuno:key', userKey);
+  }
+  return { name, avatar: null, roomKey, userKey };
 }
 
 export async function joinRoom(identity: Identity): Promise<Room> {

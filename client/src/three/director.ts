@@ -4,7 +4,7 @@ import * as sfx from '../sfx';
 import { COLOR_HEX } from './cardArt';
 import type { GameEvent } from './events';
 import { emitFx, type Vec3 } from './fx';
-import { DISCARD, DRAW_PILE, MY_SEAT } from './layout';
+import { deckWorldPose, DISCARD, MY_SEAT } from './layout';
 
 const RAINBOW = Object.values(COLOR_HEX);
 const FIRE = ['#ffdd55', '#ff8a00', '#ff3b1f', '#ffffff'];
@@ -23,7 +23,7 @@ export function direct(events: GameEvent[], view: RoomView, game: GameView, seat
       case 'start':
         sfx.shuffle();
         emitFx({ kind: 'text', text: '開局！', tone: 'gold' });
-        emitFx({ kind: 'burst', at: v(DRAW_PILE, 0.4), colors: RAINBOW, count: 120, speed: 4, up: 3 });
+        emitFx({ kind: 'burst', at: v(deckWorldPose(innerWidth / innerHeight, innerHeight).pos), colors: RAINBOW, count: 120, speed: 4, up: 3 });
         break;
 
       case 'play': {
@@ -130,6 +130,23 @@ export function direct(events: GameEvent[], view: RoomView, game: GameView, seat
 
       case 'yourTurn':
         sfx.chime();
+        break;
+
+      case 'offline':
+        sfx.powerDown();
+        emitFx({ kind: 'burst', at: v(seat(e.id), 1), colors: ['#3ee0ff', '#9aa4b2', '#ffffff'], count: 120, speed: 3, up: 1 });
+        emitFx({ kind: 'ring', at: v(seat(e.id), 0.05), color: '#3ee0ff', size: 3 });
+        break;
+
+      case 'online':
+        sfx.powerUp();
+        emitFx({ kind: 'burst', at: v(seat(e.id), 1), colors: ['#7dff9b', '#ffffff', '#ffc400'], count: 160, speed: 4, up: 2 });
+        emitFx({ kind: 'ring', at: v(seat(e.id), 0.05), color: '#7dff9b', size: 3 });
+        break;
+
+      case 'rejoin':
+        sfx.powerUp();
+        emitFx({ kind: 'text', text: '回來了！', tone: 'gold' });
         break;
 
       case 'end': {

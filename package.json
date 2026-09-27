@@ -6,7 +6,11 @@
     "dev": "concurrently -n server,client -c magenta,cyan \"npm run dev -w server\" \"npm run dev -w client\"",
     "test": "npm test -w shared",
     "typecheck": "npm run typecheck --workspaces --if-present",
-    "build": "npm run build -w client"
+    "build": "npm run build -w client",
+    "bots": "tsx scripts/bots.mts",
+    "e2e": "node scripts/e2e/play.mjs",
+    "e2e:sfx": "node scripts/e2e/sfx.mjs",
+    "e2e:rejoin": "node scripts/e2e/rejoin.mjs"
   },
   "devDependencies": {
     "concurrently": "^10.0.5",

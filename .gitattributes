@@ -1,0 +1,2 @@
+# 所有文字檔在任何電腦上都用 LF，Git 不會再跳 CRLF 警告
+* text=auto eol=lf

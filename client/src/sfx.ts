@@ -342,6 +342,18 @@ export function sadTrombone(at = 0) {
   });
 }
 
+/** 斷線：機器人開機的嗶嗶聲，音越來越低 */
+export function powerDown() {
+  tone({ type: 'square', freq: 880, to: 110, dur: 0.6, vol: 0.08, filter: 2000 });
+  tone({ type: 'square', freq: 660, dur: 0.08, vol: 0.06, at: 0.65, filter: 2500 });
+  tone({ type: 'square', freq: 990, dur: 0.08, vol: 0.06, at: 0.78, filter: 2500 });
+}
+
+/** 回來了：往上的三個音 */
+export function powerUp() {
+  [523, 784, 1047].forEach((f, i) => tone({ type: 'triangle', freq: f, dur: 0.25, vol: 0.18, at: i * 0.09 }));
+}
+
 /** 倒數最後幾秒 */
 export function tick(urgent: boolean) {
   tone({ freq: urgent ? 1400 : 1000, dur: 0.06, vol: 0.12 });

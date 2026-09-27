@@ -1,16 +1,30 @@
-import { COLORS, type Card, type GameView, type RoomView } from '@crazyuno/shared';
+import { COLORS, type Card, type Color, type GameView, type RoomView } from '@crazyuno/shared';
 import { Environment, Html, Lightformer, PerformanceMonitor, Sparkles } from '@react-three/drei';
 import { useFrame, useThree } from '@react-three/fiber';
 import { Bloom, ChromaticAberration, EffectComposer, ToneMapping, Vignette } from '@react-three/postprocessing';
 import { ToneMappingMode, type ChromaticAberrationEffect } from 'postprocessing';
-import { useEffect, useMemo, useRef, useState, type ReactElement, type RefObject } from 'react';
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactElement, type RefObject } from 'react';
 import * as THREE from 'three';
 import { Avatar } from '../components/Avatar';
-import { backTexture, CARD_H, CARD_W, COLOR_HEX, feltTexture } from './cardArt';
+import { DeckIcon, RobotIcon, SirenIcon, SkullIcon } from '../components/icons';
+import { backTexture, CARD_H, CARD_W, COLOR_HEX, feltTexture, glowTexture } from './cardArt';
 import { CardMesh, FACE_DOWN, FACE_UP, pose, type Pose } from './CardMesh';
 import { CameraRig, Particles, Shockwaves } from './Effects';
 import type { GameEvent } from './events';
-import { DISCARD, DRAW_PILE, handSlots, HAND_DIST, MY_SEAT, rig, seatMap, TABLE_RX, TABLE_RZ } from './layout';
+import {
+  DECK_TILT,
+  deckSlot,
+  deckWorldPose,
+  DISCARD,
+  handSlots,
+  HAND_DIST,
+  MY_SEAT,
+  placeRig,
+  rig,
+  seatMap,
+  TABLE_RX,
+  TABLE_RZ,
+} from './layout';
 
 interface Props {
   view: RoomView;
@@ -18,7 +32,11 @@ interface Props {
   events: GameEvent[];
   /** 每開新的一局就換一個數字，讓牌堆全部重來 */
   round: number;
-  selectedId: string | null;
+  /** 出了萬用牌、還沒選顏色：這張牌先飛到桌子中間 */
+  pendingWild: Card | null;
+  /** 要不要顯示選顏色的四個菱形 */
+  picking: boolean;
+  onPickColor(color: Color): void;
   onPlay(card: Card): void;
   onDraw(): void;
   onCatch(targetId: string): void;
@@ -35,6 +53,8 @@ export function Scene(props: Props) {
   const aspect = size.width / size.height;
   const seats = useMemo(() => seatMap(game, view.you, aspect), [game, view.you, aspect]);
   const myTurn = game.phase === 'playing' && game.turnId === view.you;
+  // 第一格畫面之前就要知道鏡頭在哪，新牌才知道從哪裡飛出來
+  if (!rig.ready) placeRig(aspect);
 
   return (
     <>
@@ -62,7 +82,14 @@ export function Scene(props: Props) {
       <TableModel color={game.currentColor} direction={game.direction} />
       <Sparkles count={70} scale={[16, 5, 12]} position={[0, 2.5, 0]} size={3} speed={0.35} opacity={0.6} color={COLOR_HEX[game.currentColor]} />
 
-      <DrawPile labels={labels} count={game.drawPileCount} active={myTurn && !game.hasDrawn} hint={myTurn && game.playable.length === 0} onDraw={props.onDraw} />
+      <Deck
+        labels={labels}
+        count={game.drawPileCount}
+        pending={myTurn ? game.pendingDraw : 0}
+        active={myTurn && !game.hasDrawn && !props.pendingWild}
+        hint={myTurn && game.playable.length === 0}
+        onDraw={props.onDraw}
+      />
       <Cards key={props.round} {...props} seats={seats} myTurn={myTurn} />
       <Ghosts key={`g${props.round}`} events={props.events} game={game} you={view.you} seats={seats} />
 
@@ -76,6 +103,7 @@ export function Scene(props: Props) {
               key={p.id}
               labels={labels}
               player={p}
+              offline={!view.seats.find((s) => s.id === p.id)?.connected}
               pos={seats.get(p.id)!}
               active={p.id === game.turnId && game.phase === 'playing'}
               color={COLOR_HEX[game.currentColor]}
@@ -86,12 +114,27 @@ export function Scene(props: Props) {
         })}
 
       {/* Html 一直掛著，只換內容：drei 的 Html 卸載時會跟 React 19 打架 */}
-      <Html portal={labels} position={[0, 1.7, 0.3]} center zIndexRange={[15, 0]}>
-        {game.pendingDraw > 0 && (
+      <Html portal={labels} position={[DISCARD.x, 1.7, DISCARD.z]} center zIndexRange={[15, 0]}>
+        {game.pendingDraw > 0 && !props.picking && (
           <div className="pending3d" style={{ fontSize: `${Math.min(6, 2.2 + game.pendingDraw * 0.06)}rem` }}>
             +{game.pendingDraw}
           </div>
         )}
+      </Html>
+
+      <Html portal={labels} position={[DISCARD.x, 0.55, DISCARD.z]} center zIndexRange={[30, 0]} pointerEvents="none">
+        <div className={`diamond-picker ${props.picking ? 'open' : ''}`}>
+          {COLORS.map((c, i) => (
+            <button
+              key={c}
+              className={`diamond ${c}`}
+              style={{ '--i': i } as CSSProperties}
+              disabled={!props.picking}
+              aria-label={c}
+              onClick={() => props.onPickColor(c)}
+            />
+          ))}
+        </div>
       </Html>
 
       <Particles />
@@ -206,39 +249,59 @@ function TableModel({ color, direction }: { color: GameView['currentColor']; dir
   );
 }
 
-// ---------- 抽牌堆 ----------
+// ---------- 抽牌堆（畫面左上角，跟著鏡頭）----------
 
-function DrawPile({
+function Deck({
   count,
+  pending,
   active,
   hint,
   onDraw,
   labels,
 }: {
   count: number;
+  /** 輪到你時累積要吃的張數 */
+  pending: number;
   active: boolean;
+  /** 沒牌可出：抽牌堆跳動提示 */
   hint: boolean;
   onDraw(): void;
   labels: RefObject<HTMLElement>;
 }) {
-  const h = Math.max(0.01, Math.min(count, 110) * 0.005);
-  const mats = useMemo(() => {
-    const side = new THREE.MeshStandardMaterial({ color: '#e9e4d8', roughness: 0.7 });
-    const top = new THREE.MeshStandardMaterial({ map: backTexture(), roughness: 0.4 });
-    return [side, side, top, side, side, side];
-  }, []);
+  const size = useThree((st) => st.size);
+  const group = useRef<THREE.Group>(null!);
   const glow = useRef<THREE.MeshBasicMaterial>(null!);
+  const thick = Math.max(0.03, Math.min(count, 110) * 0.005);
+  const tilt = useMemo(() => new THREE.Quaternion().setFromEuler(DECK_TILT), []);
+  const mats = useMemo(() => {
+    const side = new THREE.MeshStandardMaterial({ color: '#e9e4d8', roughness: 0.7, emissive: '#3a372f' });
+    const top = new THREE.MeshStandardMaterial({
+      map: backTexture(),
+      emissiveMap: backTexture(),
+      emissive: new THREE.Color(0.5, 0.5, 0.5),
+      roughness: 0.55,
+    });
+    // BoxGeometry 的面：+x -x +y -y +z(朝鏡頭) -z
+    return [side, side, side, side, top, side];
+  }, []);
+
   useFrame((st) => {
+    const slot = deckSlot(size.width / size.height, size.height);
+    const g = group.current;
+    g.position.copy(slot.pos).applyMatrix4(rig.base.matrixWorld);
+    g.quaternion.copy(rig.base.quaternion).multiply(tilt);
     const t = st.clock.elapsedTime;
-    glow.current.opacity = active ? (hint ? 0.7 + Math.sin(t * 7) * 0.3 : 0.35 + Math.sin(t * 3) * 0.15) : 0;
+    const bounce = active && hint ? Math.abs(Math.sin(t * 5)) * 0.08 : 0;
+    g.scale.setScalar(slot.scale * (1 + bounce));
+    glow.current.opacity = active ? (hint ? 0.8 + Math.sin(t * 7) * 0.2 : 0.45 + Math.sin(t * 3) * 0.2) : 0;
+    glow.current.color.set(pending > 0 ? '#ff3030' : '#ffe08a').multiplyScalar(2.5);
   });
 
   return (
-    <group position={DRAW_PILE}>
+    <group ref={group}>
       <mesh
         material={mats}
-        position-y={h / 2}
-        rotation-y={0.04}
+        position-z={-thick / 2}
         onClick={(e) => {
           e.stopPropagation();
           if (active) onDraw();
@@ -246,32 +309,25 @@ function DrawPile({
         onPointerOver={() => active && (document.body.style.cursor = 'pointer')}
         onPointerOut={() => (document.body.style.cursor = '')}
       >
-        <boxGeometry args={[CARD_W, h, CARD_H]} />
+        <boxGeometry args={[CARD_W, CARD_H, thick]} />
       </mesh>
-      <mesh rotation-x={-Math.PI / 2} position-y={0.012} raycast={() => null}>
-        <planeGeometry args={[CARD_W * 1.5, CARD_H * 1.35]} />
-        <meshBasicMaterial ref={glow} color={[2.5, 2.2, 1.2]} transparent opacity={0} blending={THREE.AdditiveBlending} depthWrite={false} toneMapped={false} alphaMap={roundGlow()} />
+      <mesh position-z={-thick - 0.01} raycast={() => null}>
+        <planeGeometry args={[CARD_W * 1.375, CARD_H * 1.25]} />
+        <meshBasicMaterial
+          ref={glow}
+          map={glowTexture()}
+          transparent
+          opacity={0}
+          blending={THREE.AdditiveBlending}
+          depthWrite={false}
+          toneMapped={false}
+        />
       </mesh>
-      <Html portal={labels} position={[0, h + 0.1, CARD_H * 0.62]} center zIndexRange={[10, 0]}>
-        {count > 0 && <div className="pile-count">{count}</div>}
+      <Html portal={labels} position={[CARD_W * 0.42, -CARD_H * 0.42, 0]} center zIndexRange={[12, 0]}>
+        <div className={`deck-badge ${pending > 0 ? 'hot' : ''}`}>{pending > 0 ? `+${pending}` : count}</div>
       </Html>
     </group>
   );
-}
-
-let roundGlowTex: THREE.Texture | null = null;
-function roundGlow() {
-  if (roundGlowTex) return roundGlowTex;
-  const c = document.createElement('canvas');
-  c.width = c.height = 128;
-  const g = c.getContext('2d')!;
-  const grad = g.createRadialGradient(64, 64, 20, 64, 64, 64);
-  grad.addColorStop(0, '#fff');
-  grad.addColorStop(1, '#000');
-  g.fillStyle = grad;
-  g.fillRect(0, 0, 128, 128);
-  roundGlowTex = new THREE.CanvasTexture(c);
-  return roundGlowTex;
 }
 
 // ---------- 牌（手牌 + 棄牌堆）----------
@@ -287,7 +343,7 @@ function Cards({
   events,
   seats,
   myTurn,
-  selectedId,
+  pendingWild,
   onPlay,
 }: Props & { seats: Map<string, THREE.Vector3>; myTurn: boolean }) {
   const size = useThree((s) => s.size);
@@ -297,14 +353,15 @@ function Cards({
   const known = useRef(new Set<string>());
 
   const hand = useMemo(() => sortHand(game.hand ?? []), [game.hand]);
-  const pileTop = DRAW_PILE.clone().setY(Math.min(game.drawPileCount, 110) * 0.005 + 0.05);
+  const aspect = size.width / size.height;
+  const fromDeck = () => deckWorldPose(aspect, size.height);
 
   // 事件改變時（也就是收到新畫面時）更新棄牌堆、決定新牌從哪裡飛出來
   useMemo(() => {
     if (discard.current.length === 0) {
       // 開局翻開的第一張從抽牌堆翻過來
       discard.current.push({ card: game.topCard, rz: jitter() });
-      spawns.current.set(game.topCard.id, pose(pileTop, [FACE_DOWN, 0, 0]));
+      spawns.current.set(game.topCard.id, fromDeck());
     }
     let giver: string | null = null;
     for (const e of events) {
@@ -321,15 +378,17 @@ function Cards({
     const fresh = hand.filter((c) => !known.current.has(c.id));
     const gap = fresh.length > 20 ? 0.025 : 0.08;
     fresh.forEach((c, i) => {
-      const from = giver ? pose(seatPoint(seats, giver, 0.9), [FACE_DOWN, 0, 0], 0.7) : pose(pileTop, [FACE_DOWN, 0, 0]);
+      const from = giver ? pose(seatPoint(seats, giver, 0.9), [FACE_DOWN, 0, 0], 0.7) : fromDeck();
       spawns.current.set(c.id, from);
       delays.current.set(c.id, i * gap);
     });
     for (const c of hand) known.current.add(c.id);
   }, [events]);
 
-  const aspect = size.width / size.height;
-  const slots = useMemo(() => handSlots(hand.length, aspect, 78, size.height), [hand.length, aspect, size.height]);
+  // 飛到中間等選顏色的那張不算在手牌的位置裡
+  const pendingId = pendingWild && hand.some((c) => c.id === pendingWild.id) ? pendingWild.id : null;
+  const inHand = pendingId ? hand.filter((c) => c.id !== pendingId) : hand;
+  const slots = useMemo(() => handSlots(inHand.length, aspect, 78, size.height), [inHand.length, aspect, size.height]);
   const handIds = new Set(hand.map((c) => c.id));
   const items: ReactElement[] = [];
   const n = discard.current.length;
@@ -355,32 +414,54 @@ function Cards({
   });
 
   const localQ = new THREE.Quaternion();
+  const flatQ = new THREE.Quaternion();
   const euler = new THREE.Euler();
-  hand.forEach((card, i) => {
+  inHand.forEach((card, i) => {
     const slot = slots[i];
     const playable = game.playable.includes(card.id);
-    const selected = card.id === selectedId;
     items.push(
       <CardMesh
         key={card.id}
         card={card}
-        spawn={spawns.current.get(card.id) ?? pose(pileTop, [FACE_DOWN, 0, 0])}
+        spawn={spawns.current.get(card.id) ?? fromDeck()}
         delay={delays.current.get(card.id) ?? 0}
         speed={9}
-        glow={selected ? '#ffffff' : playable ? COLOR_HEX[card.color ?? game.currentColor] : null}
+        glow={playable ? COLOR_HEX[card.color ?? game.currentColor] : null}
         dim={myTurn && !playable}
         onClick={playable ? () => onPlay(card) : undefined}
         target={(out, hovered) => {
-          const lift = (playable ? 0.12 : 0) + (hovered ? 0.18 : 0) + (selected ? 0.3 : 0);
-          out.pos.set(slot.x, slot.y + lift * slot.scale * 1.5, slot.z + (hovered || selected ? 0.25 : 0));
+          const lift = (playable ? 0.12 : 0) + (hovered ? 0.18 : 0);
+          out.pos.set(slot.x, slot.y + lift * slot.scale * 1.5, slot.z + (hovered ? 0.25 : 0));
           out.pos.applyMatrix4(rig.base.matrixWorld);
-          euler.set(0, 0, hovered || selected ? 0 : slot.rz);
+          euler.set(0, 0, hovered ? 0 : slot.rz);
           out.quat.copy(rig.base.quaternion).multiply(localQ.setFromEuler(euler));
-          out.scale = slot.scale * (hovered || selected ? 1.15 : 1);
+          out.scale = slot.scale * (hovered ? 1.15 : 1);
         }}
       />,
     );
   });
+
+  // 萬用牌先丟到桌子中間浮著，半躺半朝鏡頭，等選完顏色
+  const pendingCard = pendingId ? hand.find((c) => c.id === pendingId)! : null;
+  if (pendingCard) {
+    const topY = 0.012 + discard.current.length * 0.006;
+    items.push(
+      <CardMesh
+        key={pendingCard.id}
+        card={pendingCard}
+        spawn={fromDeck()}
+        speed={7}
+        glow="#ffffff"
+        target={(out) => {
+          const t = performance.now() / 1000;
+          out.pos.copy(DISCARD).setY(topY + 0.55 + Math.sin(t * 3) * 0.05);
+          flatQ.setFromEuler(euler.set(FACE_UP, 0, Math.sin(t * 2) * 0.08));
+          out.quat.copy(flatQ).slerp(rig.base.quaternion, 0.45);
+          out.scale = 1.25;
+        }}
+      />,
+    );
+  }
 
   return <>{items}</>;
 }
@@ -425,17 +506,18 @@ let ghostId = 0;
 
 function Ghosts({ events, game, you, seats }: { events: GameEvent[]; game: GameView; you: string; seats: Map<string, THREE.Vector3> }) {
   const [ghosts, setGhosts] = useState<Ghost[]>([]);
+  const size = useThree((st) => st.size);
 
   useEffect(() => {
     const add: Ghost[] = [];
-    const pileTop = DRAW_PILE.clone().setY(Math.min(game.drawPileCount, 110) * 0.005 + 0.05);
+    const deck = deckWorldPose(size.width / size.height, size.height);
     const seatPose = (id: string) => pose(seatPoint(seats, id, 0.9), [-0.35, seatYaw(seats.get(id)!), 0], 0.6);
 
     for (const e of events) {
       if (e.t === 'draw' && e.id !== you) {
         const shown = Math.min(e.n, 24);
         for (let i = 0; i < shown; i++) {
-          add.push({ id: ghostId++, from: pose(pileTop, [FACE_DOWN, 0, 0]), to: seatPose(e.id), delay: i * (e.n > 10 ? 0.04 : 0.1), speed: 7 });
+          add.push({ id: ghostId++, from: deck, to: seatPose(e.id), delay: i * (e.n > 10 ? 0.04 : 0.1), speed: 7 });
         }
       } else if (e.t === 'swap') {
         // 每個人的手牌往下一家飛
@@ -468,8 +550,8 @@ function Ghosts({ events, game, you, seats }: { events: GameEvent[]; game: GameV
     setGhosts((g) => [...g, ...add]);
     const ids = new Set(add.map((g) => g.id));
     const maxDelay = Math.max(...add.map((g) => g.delay));
-    const t = setTimeout(() => setGhosts((g) => g.filter((x) => !ids.has(x.id))), (maxDelay + 0.9) * 1000);
-    return () => clearTimeout(t);
+    // 不在 cleanup 清掉計時器：每個新畫面都會重跑這個 effect，清掉的話這批牌會永遠卡在桌上
+    setTimeout(() => setGhosts((g) => g.filter((x) => !ids.has(x.id))), (maxDelay + 0.9) * 1000);
   }, [events]);
 
   return (
@@ -511,9 +593,12 @@ function Seat({
   canCatch,
   onCatch,
   labels,
+  offline,
 }: {
   labels: RefObject<HTMLElement>;
   player: GameView['players'][number];
+  /** 斷線中，機器人代打 */
+  offline: boolean;
   pos: THREE.Vector3;
   active: boolean;
   color: string;
@@ -550,14 +635,25 @@ function Seat({
         })}
       </group>
       <Html portal={labels} position={[0, 1.9, -0.7]} center zIndexRange={[20, 0]}>
-        <div className={`seat3d ${active ? 'active' : ''} ${player.out ? 'out' : ''}`}>
-          <Avatar name={player.name} src={player.avatar} />
+        <div className={`seat3d ${active ? 'active' : ''} ${player.out ? 'out' : ''} ${offline && !player.out ? 'bot' : ''}`}>
+          <div className="seat-face">
+            <Avatar name={player.name} src={player.avatar} />
+            {offline && !player.out && <RobotIcon className="bot-badge" aria-label="機器人代打中" />}
+          </div>
           <div className="seat-name">{player.name}</div>
-          <div className="seat-count">{player.out ? '💀 出局' : `🂠 ${player.handCount}`}</div>
+          <div className="seat-count">
+            {player.out ? (
+              <SkullIcon />
+            ) : (
+              <>
+                <DeckIcon /> <span key={player.handCount}>{player.handCount}</span>
+              </>
+            )}
+          </div>
           {player.unoSafe && !player.out && <div className="uno-badge">UNO!</div>}
           {canCatch && (
-            <button className="catch-btn" onClick={onCatch}>
-              抓！
+            <button className="catch-btn" onClick={onCatch} aria-label="抓他沒喊 UNO">
+              <SirenIcon />
             </button>
           )}
         </div>

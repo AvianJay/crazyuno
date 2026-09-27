@@ -2,9 +2,8 @@ import type { GameView } from '@crazyuno/shared';
 import * as THREE from 'three';
 import { CARD_H, CARD_W } from './cardArt';
 
-/** 抽牌堆和棄牌堆在桌上的位置 */
-export const DRAW_PILE = new THREE.Vector3(-1.1, 0, 0.3);
-export const DISCARD = new THREE.Vector3(1.1, 0, 0.3);
+/** 出掉的牌疊在桌子正中間（抽牌堆在畫面左上角，跟著鏡頭，見 deckSlot） */
+export const DISCARD = new THREE.Vector3(0, 0, 0.3);
 /** 自己沒有座位模型，特效從鏡頭前面這裡出來 */
 export const MY_SEAT = new THREE.Vector3(0, 0.6, 3.8);
 
@@ -13,13 +12,60 @@ export const TABLE_RZ = 4.6;
 
 /** 手牌離鏡頭多遠 */
 export const HAND_DIST = 3;
+/** 抽牌堆離鏡頭多遠（比手牌遠一點，重疊時手牌在前面） */
+export const DECK_DIST = HAND_DIST + 0.4;
 export const FOV = 45;
+/** 抽牌堆微微轉一個角度，看得到牌疊的厚度 */
+export const DECK_TILT = new THREE.Euler(-0.22, -0.38, 0.06);
 
 /**
  * 沒有被鏡頭晃動影響的「理想鏡頭」位置，手牌跟著它擺。
  * 由 CameraRig 每一格更新。用 Camera 而不是 Object3D，lookAt 才會用 -z 對準目標。
  */
-export const rig = { base: new THREE.PerspectiveCamera() };
+export const rig = { base: new THREE.PerspectiveCamera(), ready: false };
+
+/** 依螢幕比例擺鏡頭；angle 是繞桌子轉的角度（大風吹） */
+export function placeRig(aspect: number, angle = 0) {
+  // 直的螢幕要拉遠、拉高才看得到整張桌子
+  const f = THREE.MathUtils.clamp(1.55 / aspect, 1, 2.1);
+  const dist = 11 * f;
+  const elev = THREE.MathUtils.degToRad(aspect < 1 ? 62 : 52);
+  // 直的螢幕把桌子往上推，下面留給手牌
+  const lookZ = aspect < 1 ? 2.2 : 1.1;
+  const base = rig.base;
+  base.position.set(Math.sin(angle) * Math.cos(elev) * dist, Math.sin(elev) * dist, lookZ + Math.cos(angle) * Math.cos(elev) * dist);
+  base.lookAt(0, 0, lookZ);
+  base.updateMatrixWorld();
+  rig.ready = true;
+}
+
+/** 在離鏡頭 dist 的地方，一張牌要放大幾倍：牌高大約畫面的 22%，窄螢幕至少要並排放得下 4 張 */
+function cardScale(dist: number, aspect: number) {
+  const halfH = dist * Math.tan(THREE.MathUtils.degToRad(FOV / 2));
+  return Math.min((halfH * 2 * 0.22) / CARD_H, (halfH * aspect * 2) / 4.2 / CARD_W);
+}
+
+/** 抽牌堆在鏡頭座標裡的位置：畫面左上角 */
+export function deckSlot(aspect: number, heightPx: number) {
+  const halfH = DECK_DIST * Math.tan(THREE.MathUtils.degToRad(FOV / 2));
+  const halfW = halfH * aspect;
+  const px = (halfH * 2) / heightPx;
+  const scale = cardScale(DECK_DIST, aspect) * 0.7;
+  const w = CARD_W * scale;
+  const h = CARD_H * scale;
+  return { pos: new THREE.Vector3(-halfW + 20 * px + w * 0.55, halfH - 18 * px - h * 0.5, -DECK_DIST), scale };
+}
+
+/** 抽牌堆最上面那張在世界座標的位置，牌背朝鏡頭（新抽的牌從這裡飛出來） */
+export function deckWorldPose(aspect: number, heightPx: number) {
+  const slot = deckSlot(aspect, heightPx);
+  const tilt = new THREE.Euler(DECK_TILT.x, DECK_TILT.y + Math.PI, -DECK_TILT.z);
+  return {
+    pos: slot.pos.applyMatrix4(rig.base.matrixWorld),
+    quat: rig.base.quaternion.clone().multiply(new THREE.Quaternion().setFromEuler(tilt)),
+    scale: slot.scale,
+  };
+}
 
 /** 對手照座位順序，從自己的下一位開始排，排在桌子遠端的半圓上（左 → 右） */
 export function seatMap(game: GameView, you: string, aspect: number): Map<string, THREE.Vector3> {
@@ -59,8 +105,7 @@ export function handSlots(n: number, aspect: number, bottomPadPx: number, height
   const halfW = halfH * aspect;
   const pxToWorld = (halfH * 2) / heightPx;
 
-  // 牌高大約畫面的 22%，窄螢幕至少要並排放得下 4 張
-  const scale = Math.min((halfH * 2 * 0.22) / CARD_H, (halfW * 2) / 4.2 / CARD_W);
+  const scale = cardScale(HAND_DIST, aspect);
   const cw = CARD_W * scale;
   const ch = CARD_H * scale;
   const usable = Math.min(halfW * 2 - 0.1, cw * 12);

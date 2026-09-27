@@ -3,12 +3,14 @@
   --yellow: #f4b400;
   --green: #2bb673;
   --blue: #2f7fe0;
-  --wild: #1b1b24;
+  --pink: #ff4fd8;
+  --cyan: #3ee0ff;
   --felt: #1d4d3a;
   --felt-dark: #10301f;
   --ink: #f5f3ea;
   --muted: #b7c4bc;
-  --panel: rgba(0, 0, 0, 0.28);
+  --panel: rgba(8, 10, 18, 0.55);
+  --bounce: cubic-bezier(0.3, 1.6, 0.5, 1);
   color-scheme: dark;
 }
 
@@ -38,116 +40,20 @@ button {
   cursor: pointer;
 }
 
+button:disabled {
+  cursor: default;
+}
+
+svg {
+  flex-shrink: 0;
+}
+
 .app {
   height: 100%;
   position: relative;
 }
 
-.center-msg {
-  display: grid;
-  place-items: center;
-  height: 100%;
-  font-size: 1.2rem;
-  padding: 16px;
-  text-align: center;
-}
-
-.banner {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  background: #b8860b;
-  text-align: center;
-  padding: 6px;
-  z-index: 50;
-}
-
-.toast {
-  position: fixed;
-  bottom: 38%;
-  left: 50%;
-  transform: translateX(-50%);
-  background: rgba(0, 0, 0, 0.85);
-  padding: 10px 18px;
-  border-radius: 999px;
-  z-index: 60;
-  animation: pop 0.2s ease-out;
-  max-width: calc(100% - 32px);
-  text-align: center;
-}
-
-/* ---------- 大廳 ---------- */
-
-.lobby {
-  height: 100%;
-  overflow-y: auto;
-  padding: 24px 16px 40px;
-  max-width: 720px;
-  margin: 0 auto;
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-.title {
-  text-align: center;
-  font-size: 2.6rem;
-  margin: 8px 0;
-  letter-spacing: 0.05em;
-  transform: rotate(-3deg);
-}
-
-.title span {
-  display: inline-block;
-  background: var(--red);
-  color: var(--yellow);
-  padding: 0 14px;
-  border-radius: 12px;
-  border: 4px solid white;
-  font-style: italic;
-  text-shadow: 3px 3px 0 #000;
-}
-
-.panel {
-  background: var(--panel);
-  border-radius: 14px;
-  padding: 14px 16px;
-}
-
-.panel h2 {
-  margin: 0 0 10px;
-  font-size: 1.05rem;
-  color: var(--muted);
-}
-
-.seats {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-}
-
-.seats li {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  background: rgba(255, 255, 255, 0.08);
-  padding: 6px 12px 6px 6px;
-  border-radius: 999px;
-}
-
-.seats li.offline {
-  opacity: 0.4;
-}
-
-.seats em {
-  font-style: normal;
-  font-size: 0.8rem;
-  color: var(--muted);
-}
+/* ---------- 共用 ---------- */
 
 .avatar {
   width: 36px;
@@ -160,78 +66,654 @@ button {
   object-fit: cover;
 }
 
-.crazy-list {
+.round-btn {
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  border: 3px solid rgba(255, 255, 255, 0.8);
+  background: rgba(255, 255, 255, 0.12);
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-  gap: 8px;
+  place-items: center;
+  font-size: 1.7rem;
+  transition: transform 0.15s var(--bounce);
 }
 
-.crazy-list label {
+.round-btn:hover {
+  transform: scale(1.1) rotate(-8deg);
+}
+
+.round-btn:active {
+  transform: scale(0.92);
+}
+
+.round-btn.big {
+  width: 84px;
+  height: 84px;
+  font-size: 2.4rem;
+  background: var(--yellow);
+  color: #222;
+  border-color: #fff;
+  box-shadow: 0 0 30px rgba(244, 180, 0, 0.7);
+  animation: breathe 1.6s ease-in-out infinite;
+}
+
+.icon-btn {
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 50%;
+  width: 42px;
+  height: 42px;
   display: grid;
-  grid-template-columns: auto 1fr;
-  gap: 2px 8px;
-  padding: 10px;
-  border-radius: 10px;
-  background: rgba(255, 255, 255, 0.05);
-  border: 2px solid transparent;
-  cursor: pointer;
-  align-content: start;
+  place-items: center;
+  font-size: 1.25rem;
+  backdrop-filter: blur(6px);
+  transition: transform 0.15s var(--bounce);
 }
 
-.crazy-list label.on {
-  border-color: var(--yellow);
-  background: rgba(244, 180, 0, 0.12);
+.icon-btn:active {
+  transform: scale(0.88);
 }
 
-.crazy-list small {
-  grid-column: 2;
-  color: var(--muted);
-  font-size: 0.8rem;
+.spin-slow {
+  animation: hourglass 2.4s ease-in-out infinite;
 }
 
-.numbers {
+.bob {
+  animation: bob 0.9s ease-in-out infinite;
+}
+
+.spinner {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 3px solid rgba(255, 255, 255, 0.25);
+  border-top-color: #fff;
+  animation: spin 0.8s linear infinite;
+}
+
+/* 斷線提示 */
+.banner {
+  position: fixed;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
   display: flex;
-  flex-wrap: wrap;
-  gap: 12px;
-  margin-top: 14px;
+  align-items: center;
+  gap: 10px;
+  background: #b8860b;
+  padding: 8px 14px;
+  border-radius: 999px;
+  z-index: 50;
+  font-size: 1.3rem;
+  box-shadow: 0 0 24px rgba(184, 134, 11, 0.7);
+  animation: drop-in 0.4s var(--bounce);
 }
 
-.number-field {
+.banner-icon {
+  animation: blink 1s steps(2) infinite;
+}
+
+.banner-btn {
+  background: rgba(0, 0, 0, 0.3);
+  border: none;
+  border-radius: 50%;
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+}
+
+.toast {
+  position: fixed;
+  bottom: 38%;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(20, 0, 0, 0.88);
+  border: 2px solid var(--red);
+  padding: 10px 18px;
+  border-radius: 999px;
+  z-index: 60;
+  animation: toast 0.35s var(--bounce);
+  max-width: calc(100% - 32px);
+  box-shadow: 0 0 24px rgba(229, 56, 59, 0.5);
+}
+
+.toast-icon {
+  color: var(--yellow);
+  font-size: 1.3rem;
+}
+
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(3px);
+  display: grid;
+  place-items: center;
+  z-index: 40;
+  padding: 16px;
+  animation: fade-in 0.4s ease-out;
+}
+
+/* ---------- 背景飄的牌 ---------- */
+
+.floaters {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.floater {
+  position: absolute;
+  bottom: -160px;
+  width: var(--size);
+  border-radius: 6px;
+  opacity: 0.16;
+  animation: float-up linear infinite;
+}
+
+/* ---------- 載入中 ---------- */
+
+.loader-screen {
+  position: relative;
+  height: 100%;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 30% 20%, rgba(255, 79, 216, 0.18), transparent 45%),
+    radial-gradient(circle at 70% 80%, rgba(62, 224, 255, 0.15), transparent 45%);
+  animation: fade-in 0.5s ease-out;
+}
+
+.loader {
+  position: relative;
+  z-index: 1;
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  font-size: 0.85rem;
+  align-items: center;
+  gap: 22px;
+  padding: 16px;
+  text-align: center;
+}
+
+.shuffle {
+  position: relative;
+  width: 96px;
+  height: 144px;
+  perspective: 600px;
+}
+
+.lc {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border-radius: 10px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6);
+}
+
+.lc1 {
+  animation: shuffle-left 1.8s var(--bounce) infinite;
+}
+
+.lc2 {
+  animation: shuffle-mid 1.8s ease-in-out infinite;
+  z-index: 1;
+}
+
+.lc3 {
+  animation: shuffle-right 1.8s var(--bounce) infinite;
+}
+
+.dots {
+  display: flex;
+  gap: 10px;
+}
+
+.dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  animation: dot 1s ease-in-out infinite;
+}
+
+.dot.red {
+  background: var(--red);
+}
+.dot.yellow {
+  background: var(--yellow);
+}
+.dot.green {
+  background: var(--green);
+}
+.dot.blue {
+  background: var(--blue);
+}
+
+.loader-caption {
+  color: var(--muted);
+  font-size: 0.9rem;
+  letter-spacing: 0.3em;
+  max-width: 480px;
+}
+
+.loader.error .loader-caption {
+  letter-spacing: normal;
+  color: var(--ink);
+  background: rgba(0, 0, 0, 0.4);
+  padding: 8px 14px;
+  border-radius: 12px;
+}
+
+.broken {
+  position: relative;
+  width: 96px;
+  height: 144px;
+}
+
+.broken .half {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border-radius: 10px;
+}
+
+.broken .left {
+  clip-path: polygon(0 0, 55% 0, 40% 35%, 60% 55%, 45% 100%, 0 100%);
+  animation: crack-left 2s ease-in-out infinite alternate;
+}
+
+.broken .right {
+  clip-path: polygon(55% 0, 100% 0, 100% 100%, 45% 100%, 60% 55%, 40% 35%);
+  animation: crack-right 2s ease-in-out infinite alternate;
+}
+
+.broken-alert {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  translate: -50% -50%;
+  font-size: 2.6rem;
+  color: var(--yellow);
+  filter: drop-shadow(0 0 8px #000);
+  animation: pulse 1s ease-in-out infinite;
+}
+
+/* ---------- 大廳 ---------- */
+
+.lobby-screen {
+  position: relative;
+  height: 100%;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 20% 10%, rgba(255, 79, 216, 0.16), transparent 40%),
+    radial-gradient(circle at 85% 90%, rgba(62, 224, 255, 0.14), transparent 40%);
+}
+
+.lobby {
+  position: relative;
+  z-index: 1;
+  height: 100%;
+  overflow-y: auto;
+  padding: 20px 16px 40px;
+  max-width: 720px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 16px;
+}
+
+.title {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 10px;
+  font-size: 2.8rem;
+  margin: 6px 0;
+  animation: drop-in 0.7s var(--bounce);
+}
+
+.title-crazy {
+  color: var(--pink);
+  font-weight: 900;
+  text-shadow:
+    0 0 10px var(--pink),
+    0 0 24px var(--pink);
+  animation: neon 3s infinite;
+}
+
+.title-uno {
+  display: inline-block;
+  background: var(--red);
+  color: var(--yellow);
+  padding: 0 14px;
+  border-radius: 14px;
+  border: 4px solid white;
+  font-style: italic;
+  font-weight: 900;
+  text-shadow: 3px 3px 0 #000;
+  box-shadow: 0 0 30px rgba(229, 56, 59, 0.6);
+  animation: wobble 2.6s ease-in-out infinite;
+}
+
+.panel {
+  background: var(--panel);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(8px);
+  border-radius: 18px;
+  padding: 14px 16px;
+  animation: rise-in 0.6s var(--bounce) both;
+  animation-delay: calc(0.15s + var(--i) * 0.12s);
+}
+
+.panel-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 12px;
+  font-size: 1.3rem;
   color: var(--muted);
 }
 
-.number-field input {
-  width: 110px;
-  padding: 6px 8px;
-  border-radius: 8px;
-  border: none;
-  font: inherit;
+.panel-head .count {
+  font-size: 1rem;
+  font-weight: bold;
+  background: rgba(255, 255, 255, 0.1);
+  padding: 1px 10px;
+  border-radius: 999px;
+  color: var(--ink);
+}
+
+.panel-head .bolt {
+  color: var(--yellow);
+  filter: drop-shadow(0 0 6px var(--yellow));
+}
+
+.panel-head .lock {
+  margin-left: auto;
   font-size: 1rem;
 }
 
-.big-btn {
-  background: var(--yellow);
-  color: #222;
-  border: none;
-  border-radius: 14px;
-  padding: 14px 28px;
-  font-size: 1.2rem;
-  font-weight: bold;
-  box-shadow: 0 4px 0 #a37800;
+.seats {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
 }
 
-.big-btn:disabled {
-  opacity: 0.5;
-  cursor: default;
+.seats li {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  width: 64px;
+  animation: pop-in 0.5s var(--bounce) both;
+  animation-delay: calc(0.3s + var(--i, 0) * 0.08s);
+}
+
+.seats li.offline {
+  opacity: 0.35;
+  filter: grayscale(1);
+}
+
+.seat-avatar {
+  position: relative;
+  display: grid;
+  place-items: center;
+}
+
+.seat-avatar .avatar {
+  width: 52px;
+  height: 52px;
+  font-size: 1.3rem;
+  border: 3px solid rgba(255, 255, 255, 0.2);
+}
+
+.seats li.me .seat-avatar .avatar {
+  border-color: var(--yellow);
+  box-shadow: 0 0 16px rgba(244, 180, 0, 0.7);
+}
+
+.crown {
+  position: absolute;
+  top: -14px;
+  left: 50%;
+  translate: -50% 0;
+  font-size: 1.3rem;
+  color: gold;
+  filter: drop-shadow(0 0 4px rgba(255, 200, 0, 0.9));
+  animation: bob 1.4s ease-in-out infinite;
+}
+
+.seat-label {
+  font-size: 0.75rem;
+  max-width: 64px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--muted);
+}
+
+.empty-seat .seat-avatar {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  border: 3px dashed rgba(255, 255, 255, 0.35);
+  font-size: 1.4rem;
+  color: rgba(255, 255, 255, 0.5);
+  animation: breathe 1.4s ease-in-out infinite;
+}
+
+/* 怪牌：開 = 牌面朝上會發光，關 = 翻到背面 */
+.crazy-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(84px, 1fr));
+  gap: 12px;
+}
+
+.crazy-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  background: none;
+  border: none;
+  padding: 4px 0;
+  animation: pop-in 0.5s var(--bounce) both;
+  animation-delay: calc(0.4s + var(--i) * 0.07s);
+}
+
+.flip {
+  position: relative;
+  width: 72px;
+  aspect-ratio: 2 / 3;
+  transform-style: preserve-3d;
+  transition:
+    transform 0.6s var(--bounce),
+    filter 0.3s;
+  transform: rotateY(180deg);
+}
+
+.crazy-card.on .flip {
+  transform: rotateY(0);
+  filter: drop-shadow(0 0 10px rgba(255, 79, 216, 0.8));
+  animation: hover-card 2.4s ease-in-out infinite;
+  animation-delay: calc(var(--i) * 0.3s);
+}
+
+.crazy-card:not(:disabled):hover .flip {
+  scale: 1.08;
+}
+
+.flip img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border-radius: 8px;
+  backface-visibility: hidden;
+}
+
+.flip .back {
+  transform: rotateY(180deg);
+}
+
+.crazy-name {
+  font-size: 0.8rem;
+  font-weight: bold;
+  color: var(--muted);
+  transition: color 0.3s;
+}
+
+.crazy-card.on .crazy-name {
+  color: var(--ink);
+}
+
+/* 說明只在滑鼠移上去時冒出來 */
+.crazy-desc {
+  position: absolute;
+  bottom: calc(100% - 4px);
+  left: 50%;
+  width: 180px;
+  translate: -50% 0;
+  background: rgba(0, 0, 0, 0.9);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  padding: 8px 10px;
+  border-radius: 10px;
+  font-size: 0.75rem;
+  line-height: 1.4;
+  pointer-events: none;
+  opacity: 0;
+  scale: 0.8;
+  transition:
+    opacity 0.2s,
+    scale 0.2s var(--bounce);
+  z-index: 5;
+}
+
+.crazy-card:hover .crazy-desc {
+  opacity: 1;
+  scale: 1;
+}
+
+.steppers {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 12px;
+}
+
+.stepper {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(255, 255, 255, 0.07);
+  border-radius: 999px;
+  padding: 6px 10px;
+}
+
+.stepper-icon {
+  display: grid;
+  font-size: 1.5rem;
+  color: var(--yellow);
+}
+
+.stepper-value {
+  min-width: 2.2ch;
+  display: grid;
+  place-items: center;
+  text-align: center;
+  font-size: 1.3rem;
+  font-weight: 900;
+  font-variant-numeric: tabular-nums;
+  animation: number-pop 0.3s var(--bounce);
+}
+
+.step-btn {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(255, 255, 255, 0.14);
+  display: grid;
+  place-items: center;
+  font-size: 0.9rem;
+  transition: transform 0.12s var(--bounce);
+}
+
+.step-btn:active:not(:disabled) {
+  transform: scale(0.85);
+}
+
+.step-btn:disabled {
+  opacity: 0.3;
+}
+
+.start-btn {
+  align-self: center;
+  position: relative;
+  width: 96px;
+  height: 96px;
+  border-radius: 50%;
+  border: 4px solid #fff;
+  background: var(--yellow);
+  color: #222;
+  font-size: 2.8rem;
+  display: grid;
+  place-items: center;
+  box-shadow:
+    0 6px 0 #a37800,
+    0 0 40px rgba(244, 180, 0, 0.6);
+  animation:
+    pop-in 0.6s var(--bounce) 0.6s both,
+    breathe 1.6s ease-in-out 1.2s infinite;
+  flex-shrink: 0;
+}
+
+.start-btn::after {
+  content: '';
+  position: absolute;
+  inset: -4px;
+  border-radius: 50%;
+  border: 3px solid var(--yellow);
+  animation: ring-out 1.6s ease-out infinite;
+}
+
+.start-btn:disabled {
+  background: rgba(255, 255, 255, 0.15);
+  color: var(--ink);
+  border-color: rgba(255, 255, 255, 0.4);
+  box-shadow: none;
+}
+
+.start-btn:disabled::after {
+  display: none;
 }
 
 .waiting {
-  text-align: center;
+  align-self: center;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 2rem;
   color: var(--muted);
+  animation: pop-in 0.6s var(--bounce) 0.6s both;
+}
+
+.waiting .avatar {
+  width: 48px;
+  height: 48px;
 }
 
 /* ---------- 3D 牌桌 ---------- */
@@ -242,6 +724,7 @@ button {
   overflow: hidden;
   background: #05060b;
   --glow: var(--yellow);
+  animation: fade-in 0.8s ease-out;
 }
 
 .table3d.color-red {
@@ -286,72 +769,162 @@ button {
   animation: edge-pulse 1.4s ease-in-out infinite;
 }
 
-.hud-top {
+/* 上方中間：現在輪到誰 */
+.turn-pill {
   position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
   display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: 12px;
-  padding: 10px 12px;
-  pointer-events: none;
-  z-index: 10;
+  align-items: center;
+  gap: 8px;
+  height: 44px;
+  padding: 0 14px 0 6px;
+  background: rgba(0, 0, 0, 0.55);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  backdrop-filter: blur(6px);
+  border-radius: 999px;
+  font-size: 1.4rem;
+  z-index: 11;
+  transition:
+    background 0.3s,
+    box-shadow 0.3s;
 }
 
-.log3d {
-  font-size: 0.78rem;
-  color: var(--muted);
-  max-width: min(340px, 34vw);
-  text-shadow: 0 1px 3px #000;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
+.turn-pill .avatar {
+  width: 32px;
+  height: 32px;
+  font-size: 0.9rem;
 }
 
-.log3d div {
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  opacity: 0.6;
+.turn-pill.mine {
+  padding: 0 16px;
+  background: var(--glow);
+  color: #111;
+  box-shadow: 0 0 28px var(--glow);
+  animation: breathe 1.2s ease-in-out infinite;
 }
 
-.log3d div:last-child {
-  color: var(--ink);
-  opacity: 1;
+.pill-pending {
+  font-weight: 900;
+  font-size: 1.2rem;
+  color: #fff;
+  background: var(--red);
+  border-radius: 999px;
+  padding: 0 8px;
+  animation: pulse 0.6s ease-in-out infinite;
 }
 
 .hud-right {
-  margin-left: auto;
+  position: absolute;
+  top: 12px;
+  right: 12px;
   display: flex;
   gap: 8px;
   align-items: center;
-  pointer-events: auto;
+  z-index: 10;
 }
 
-.icon-btn {
-  background: rgba(255, 255, 255, 0.1);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  border-radius: 50%;
-  width: 40px;
-  height: 40px;
-  font-size: 1.1rem;
-  backdrop-filter: blur(6px);
-}
-
-.timer {
+.timer-ring {
+  position: relative;
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  font-weight: 900;
   font-variant-numeric: tabular-nums;
   background: rgba(0, 0, 0, 0.45);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  padding: 6px 12px;
-  border-radius: 999px;
-  font-weight: bold;
+  border-radius: 50%;
 }
 
-.timer.hurry {
-  background: var(--red);
-  animation: pulse 0.5s infinite;
+.timer-ring svg {
+  position: absolute;
+  inset: 0;
+}
+
+.timer-ring .track {
+  fill: none;
+  stroke: rgba(255, 255, 255, 0.15);
+  stroke-width: 4;
+}
+
+.timer-ring .bar {
+  fill: none;
+  stroke: var(--glow);
+  stroke-width: 4;
+  stroke-linecap: round;
+  transition: stroke-dasharray 0.25s linear;
+}
+
+.timer-ring.hurry {
+  color: #fff;
+  animation: shake 0.3s infinite;
+}
+
+.timer-ring.hurry .bar {
+  stroke: var(--red);
+}
+
+/* 右上角的動態紀錄 */
+.feed {
+  position: absolute;
+  top: 66px;
+  right: 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+  z-index: 9;
+  pointer-events: none;
+}
+
+.feed-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 8px 3px 3px;
+  background: rgba(0, 0, 0, 0.5);
+  border-radius: 999px;
+  animation: slide-in 0.4s var(--bounce);
+  font-weight: bold;
+  font-size: 0.9rem;
+}
+
+.feed-item:nth-last-child(n + 3) {
+  opacity: 0.55;
+}
+
+.feed-item .avatar {
+  width: 26px;
+  height: 26px;
+  font-size: 0.75rem;
+}
+
+.feed-card {
+  width: 22px;
+  height: 33px;
+  border-radius: 3px;
+}
+
+.feed-draw {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  color: #ff8a8a;
+}
+
+.feed-uno {
+  color: var(--yellow);
+  font-style: italic;
+  font-weight: 900;
+}
+
+.feed-icon {
+  font-size: 1.2rem;
+}
+
+.feed-icon.danger {
+  color: #ff5a5a;
 }
 
 .hud-bottom {
@@ -360,81 +933,52 @@ button {
   right: 0;
   bottom: 0;
   display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 6px;
+  justify-content: center;
   padding: 0 16px 12px;
   pointer-events: none;
   z-index: 10;
 }
 
-.turn-pill {
-  position: absolute;
-  top: 12px;
-  left: 50%;
-  transform: translateX(-50%);
-  background: rgba(0, 0, 0, 0.5);
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  backdrop-filter: blur(6px);
-  padding: 6px 16px;
-  border-radius: 999px;
-  font-weight: bold;
-  font-size: 0.95rem;
-  white-space: nowrap;
-  max-width: calc(100% - 140px);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  z-index: 11;
-}
-
-.turn-pill.mine {
-  background: var(--glow);
-  color: #111;
-  box-shadow: 0 0 24px var(--glow);
-}
-
-/* 窄螢幕沒位置放紀錄 */
-@media (max-width: 700px) {
-  .log3d {
-    display: none;
-  }
-
-  .turn-pill {
-    left: 12px;
-    transform: none;
-  }
-}
-
 .actions {
   display: flex;
   justify-content: center;
-  gap: 10px;
+  align-items: center;
+  gap: 12px;
   pointer-events: auto;
 }
 
 .actions button {
-  background: rgba(10, 12, 20, 0.7);
-  border: 2px solid rgba(255, 255, 255, 0.3);
+  height: 48px;
+  border-radius: 999px;
+  border: 2px solid rgba(255, 255, 255, 0.35);
   backdrop-filter: blur(6px);
-  border-radius: 14px;
-  padding: 10px 20px;
-  font-weight: bold;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
-  transition: transform 0.1s;
+  transition: transform 0.12s var(--bounce);
 }
 
 .actions button:active {
-  transform: scale(0.94);
+  transform: scale(0.9);
 }
 
-.actions .uno-btn {
+.pass-btn {
+  width: 48px;
+  display: grid;
+  place-items: center;
+  font-size: 1.3rem;
+  background: rgba(10, 12, 20, 0.75);
+  animation: pop-in 0.4s var(--bounce);
+}
+
+.uno-btn {
+  padding: 0 22px;
   background: var(--red);
-  border-color: white;
+  border-color: #fff !important;
   font-style: italic;
   font-weight: 900;
+  font-size: 1.1rem;
 }
 
-.actions .uno-btn.ready {
+.uno-btn.ready {
   animation: pulse 0.8s infinite;
   background: var(--yellow);
   color: #222;
@@ -457,9 +1001,10 @@ button {
   transition:
     border-color 0.3s,
     box-shadow 0.3s,
-    transform 0.3s;
+    transform 0.3s var(--bounce);
   pointer-events: none;
   user-select: none;
+  animation: pop-in 0.5s var(--bounce);
 }
 
 .seat3d.active {
@@ -478,6 +1023,46 @@ button {
   height: 32px;
 }
 
+.seat-face {
+  position: relative;
+  display: grid;
+  place-items: center;
+}
+
+/* 斷線：頭像變灰，蓋一個機器人 */
+.seat3d.bot {
+  border-color: rgba(62, 224, 255, 0.6);
+  box-shadow: 0 0 14px rgba(62, 224, 255, 0.4);
+}
+
+.seat3d.bot .avatar {
+  filter: grayscale(1) brightness(0.6);
+}
+
+.bot-badge {
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  font-size: 1.5rem;
+  color: var(--cyan);
+  filter: drop-shadow(0 0 4px #000);
+  animation: bot-bob 1.2s ease-in-out infinite;
+}
+
+.bot-think {
+  color: var(--cyan);
+  animation: bot-bob 0.6s ease-in-out infinite;
+}
+
+.feed-icon.bot {
+  color: var(--cyan);
+}
+
+.feed-icon.back {
+  color: #7dff9b;
+  animation: shake 0.5s 2;
+}
+
 .seat-name {
   font-size: 0.8rem;
   max-width: 90px;
@@ -487,8 +1072,17 @@ button {
 }
 
 .seat-count {
-  font-size: 0.8rem;
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 0.85rem;
+  font-weight: bold;
   color: var(--muted);
+}
+
+.seat-count span {
+  display: inline-block;
+  animation: number-pop 0.3s var(--bounce);
 }
 
 .uno-badge {
@@ -497,32 +1091,49 @@ button {
   right: -8px;
   background: var(--red);
   font-size: 0.7rem;
-  font-weight: bold;
+  font-weight: 900;
+  font-style: italic;
   padding: 1px 5px;
   border-radius: 6px;
   transform: rotate(10deg);
   box-shadow: 0 0 10px var(--red);
+  animation: pop-in 0.4s var(--bounce);
 }
 
 .catch-btn {
   pointer-events: auto;
   background: var(--red);
-  border: none;
-  border-radius: 8px;
-  padding: 2px 10px;
-  font-weight: bold;
-  margin-top: 2px;
+  border: 2px solid #fff;
+  border-radius: 50%;
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  font-size: 1.2rem;
+  margin-top: 3px;
   animation: shake 0.4s infinite;
-  box-shadow: 0 0 14px var(--red);
+  box-shadow: 0 0 16px var(--red);
 }
 
-.pile-count {
-  font-size: 0.75rem;
-  color: var(--muted);
-  background: rgba(0, 0, 0, 0.5);
-  padding: 0 6px;
-  border-radius: 6px;
+/* 抽牌堆右下角的張數 */
+.deck-badge {
+  font-size: 0.8rem;
+  font-weight: 900;
+  color: #fff;
+  background: rgba(0, 0, 0, 0.7);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  padding: 1px 7px;
+  border-radius: 999px;
   pointer-events: none;
+  font-variant-numeric: tabular-nums;
+}
+
+.deck-badge.hot {
+  font-size: 1.1rem;
+  background: var(--red);
+  border-color: #fff;
+  box-shadow: 0 0 14px var(--red);
+  animation: pulse 0.6s ease-in-out infinite;
 }
 
 .pending3d {
@@ -537,6 +1148,118 @@ button {
   animation: pulse 0.6s ease-in-out infinite;
   pointer-events: none;
   white-space: nowrap;
+}
+
+/* 選顏色：四個菱形（2×2 的方格轉 45 度），圍在打出去的牌旁邊 */
+.diamond-picker {
+  --s: clamp(46px, 9vmin, 70px);
+  --gap: clamp(62px, 13vmin, 104px);
+  display: grid;
+  grid-template-columns: var(--s) var(--s);
+  gap: var(--gap);
+  transform: rotate(45deg) scale(0.2);
+  opacity: 0;
+  pointer-events: none;
+  transition:
+    transform 0.45s var(--bounce),
+    opacity 0.2s;
+}
+
+.diamond-picker.open {
+  transform: rotate(45deg) scale(1);
+  opacity: 1;
+}
+
+.diamond {
+  width: var(--s);
+  height: var(--s);
+  border-radius: 10px;
+  border: 3px solid #fff;
+  pointer-events: none;
+  box-shadow:
+    0 0 18px var(--c),
+    inset 0 0 12px rgba(255, 255, 255, 0.35);
+  background: radial-gradient(circle at 30% 30%, color-mix(in srgb, var(--c) 60%, #fff), var(--c) 60%);
+  transition: transform 0.15s var(--bounce);
+}
+
+.diamond-picker.open .diamond {
+  pointer-events: auto;
+  animation: diamond-in 0.5s var(--bounce) both;
+  animation-delay: calc(var(--i) * 0.06s);
+}
+
+.diamond:hover {
+  transform: scale(1.18);
+}
+
+.diamond:active {
+  transform: scale(0.9);
+}
+
+.diamond.red {
+  --c: var(--red);
+}
+.diamond.yellow {
+  --c: var(--yellow);
+}
+.diamond.green {
+  --c: var(--green);
+}
+.diamond.blue {
+  --c: var(--blue);
+}
+
+/* 結束畫面 */
+.result {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  background: rgba(14, 16, 28, 0.9);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 24px;
+  padding: 24px 36px;
+  animation: drop-in 0.6s var(--bounce);
+}
+
+.trophy {
+  font-size: 4.5rem;
+  color: gold;
+  filter: drop-shadow(0 0 16px rgba(255, 200, 0, 0.8));
+  animation: trophy 1.6s ease-in-out infinite;
+}
+
+.winner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+.winner-avatar .avatar {
+  width: 76px;
+  height: 76px;
+  font-size: 2rem;
+  border: 4px solid gold;
+  box-shadow: 0 0 24px rgba(255, 200, 0, 0.7);
+  animation: pop-in 0.6s var(--bounce) 0.2s both;
+}
+
+.winner-name {
+  font-size: 1.3rem;
+  font-weight: 900;
+}
+
+.result-actions {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+}
+
+.waiting-icon {
+  font-size: 2.4rem;
+  color: var(--muted);
 }
 
 /* ---------- 特效大字 ---------- */
@@ -616,102 +1339,28 @@ button {
   font-style: normal;
 }
 
-/* 選顏色時不要把整個畫面蓋暗，才看得到選中的牌 */
-.overlay.clear {
-  background: rgba(0, 0, 0, 0.25);
-  place-items: end center;
-  padding-bottom: 38vh;
-}
-
-.overlay .color-picker {
-  background: rgba(12, 14, 24, 0.85);
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  backdrop-filter: blur(10px);
-}
-
-.swatch {
-  box-shadow: 0 0 18px currentColor;
-  transition: transform 0.1s;
-}
-
-.swatch:hover {
-  transform: scale(1.08);
-}
-
-/* ---------- 彈出視窗 ---------- */
-
-.overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.6);
-  display: grid;
-  place-items: center;
-  z-index: 40;
-  padding: 16px;
-}
-
-.color-picker,
-.result {
-  background: #1a2a22;
-  border-radius: 18px;
-  padding: 20px;
-  text-align: center;
-  animation: pop 0.2s ease-out;
-}
-
-.color-picker div {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 10px;
-}
-
-.swatch {
-  width: 96px;
-  height: 72px;
-  border-radius: 14px;
-  border: 3px solid white;
-  font-size: 1.3rem;
-  font-weight: bold;
-}
-
-.swatch.red {
-  background: var(--red);
-}
-.swatch.yellow {
-  background: var(--yellow);
-  color: #222;
-}
-.swatch.green {
-  background: var(--green);
-}
-.swatch.blue {
-  background: var(--blue);
-}
-
-.result h2 {
-  font-size: 1.8rem;
-  margin: 0 0 16px;
-}
-
-.result-actions {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  align-items: center;
-}
-
-.result-actions button:not(.big-btn) {
-  background: none;
-  border: none;
-  color: var(--muted);
-  text-decoration: underline;
-}
-
 /* ---------- 手機 ---------- */
 
 @media (max-width: 600px) {
   .title {
-    font-size: 2rem;
+    font-size: 2.2rem;
+  }
+
+  .turn-pill {
+    height: 40px;
+  }
+
+  /* 窄螢幕只留最新兩筆紀錄 */
+  .feed-item:nth-last-child(n + 3) {
+    display: none;
+  }
+}
+
+/* ---------- 動畫 ---------- */
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
   }
 }
 
@@ -722,18 +1371,222 @@ button {
   }
 }
 
+@keyframes pop-in {
+  from {
+    transform: scale(0);
+    opacity: 0;
+  }
+}
+
+@keyframes rise-in {
+  from {
+    transform: translateY(40px) scale(0.95);
+    opacity: 0;
+  }
+}
+
+@keyframes drop-in {
+  from {
+    transform: translateY(-60px) scale(0.8);
+    opacity: 0;
+  }
+}
+
+@keyframes slide-in {
+  from {
+    transform: translateX(60px);
+    opacity: 0;
+  }
+}
+
+@keyframes toast {
+  from {
+    transform: translate(-50%, 30px) scale(0.8);
+    opacity: 0;
+  }
+}
+
 @keyframes pulse {
   50% {
     transform: scale(1.1);
   }
 }
 
+@keyframes breathe {
+  50% {
+    scale: 1.06;
+  }
+}
+
+@keyframes bob {
+  50% {
+    translate: 0 4px;
+  }
+}
+
+@keyframes spin {
+  to {
+    rotate: 360deg;
+  }
+}
+
+@keyframes hourglass {
+  0%,
+  40% {
+    rotate: 0deg;
+  }
+  50%,
+  90% {
+    rotate: 180deg;
+  }
+  100% {
+    rotate: 360deg;
+  }
+}
+
+@keyframes blink {
+  50% {
+    opacity: 0.3;
+  }
+}
+
 @keyframes shake {
   25% {
-    transform: rotate(-6deg);
+    rotate: -6deg;
   }
   75% {
-    transform: rotate(6deg);
+    rotate: 6deg;
+  }
+}
+
+@keyframes wobble {
+  0%,
+  100% {
+    rotate: -4deg;
+  }
+  50% {
+    rotate: 3deg;
+    scale: 1.04;
+  }
+}
+
+@keyframes neon {
+  0%,
+  18%,
+  22%,
+  60%,
+  100% {
+    opacity: 1;
+  }
+  20%,
+  61% {
+    opacity: 0.4;
+  }
+}
+
+@keyframes float-up {
+  from {
+    transform: translateY(0) rotate(0);
+  }
+  to {
+    transform: translateY(-130vh) rotate(var(--spin));
+  }
+}
+
+@keyframes hover-card {
+  50% {
+    translate: 0 -5px;
+  }
+}
+
+@keyframes number-pop {
+  from {
+    transform: scale(1.6);
+    color: var(--yellow);
+  }
+}
+
+@keyframes ring-out {
+  from {
+    transform: scale(1);
+    opacity: 0.9;
+  }
+  to {
+    transform: scale(1.5);
+    opacity: 0;
+  }
+}
+
+@keyframes dot {
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+@keyframes shuffle-left {
+  0%,
+  100% {
+    transform: translateX(0) rotate(0);
+  }
+  30%,
+  60% {
+    transform: translateX(-62px) rotate(-18deg);
+  }
+}
+
+@keyframes shuffle-right {
+  0%,
+  100% {
+    transform: translateX(0) rotate(0);
+  }
+  30%,
+  60% {
+    transform: translateX(62px) rotate(18deg);
+  }
+}
+
+@keyframes shuffle-mid {
+  0%,
+  100% {
+    transform: translateY(0) rotateY(0);
+  }
+  45% {
+    transform: translateY(-30px) rotateY(180deg) scale(1.08);
+  }
+}
+
+@keyframes crack-left {
+  to {
+    transform: translate(-8px, 3px) rotate(-6deg);
+  }
+}
+
+@keyframes crack-right {
+  to {
+    transform: translate(8px, 3px) rotate(6deg);
+  }
+}
+
+@keyframes diamond-in {
+  from {
+    transform: scale(0) rotate(-90deg);
+  }
+}
+
+@keyframes trophy {
+  0%,
+  100% {
+    transform: translateY(0) rotate(-6deg);
+  }
+  50% {
+    transform: translateY(-8px) rotate(6deg);
+  }
+}
+
+@keyframes bot-bob {
+  50% {
+    translate: 0 -2px;
+    rotate: 6deg;
   }
 }
 
@@ -775,5 +1628,18 @@ button {
   50% {
     margin-left: 8px;
     filter: hue-rotate(90deg);
+  }
+}
+
+/* 系統設定要求減少動態時，把重複播放的動畫關掉 */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-iteration-count: 1 !important;
+  }
+
+  .floaters {
+    display: none;
   }
 }

@@ -7,6 +7,8 @@ export default defineConfig({
   envDir: '..',
   server: {
     port: 5173,
+    // 聽所有網卡（0.0.0.0），別台機器（例如 tailnet 上跑 cloudflared 的）才連得進來
+    host: true,
     // 讓 cloudflared 之類的 tunnel 網址也能連進來（Discord 測試用）
     allowedHosts: true,
     proxy: {

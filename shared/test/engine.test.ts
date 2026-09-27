@@ -2,8 +2,10 @@ import { describe, expect, it } from 'vitest';
 import {
   buildDeck,
   autoMove,
+  botMove,
   catchUno,
   createGame,
+  CRAZY_KINDS,
   DEFAULT_SETTINGS,
   drawAction,
   playCard,
@@ -48,7 +50,7 @@ describe('牌組', () => {
 
   it('怪牌全開會多出來', () => {
     let i = 0;
-    const deck = buildDeck(DEFAULT_SETTINGS.crazyCards, () => `${i++}`);
+    const deck = buildDeck(CRAZY_KINDS, () => `${i++}`);
     expect(deck.filter((c) => c.kind === 'draw99')).toHaveLength(1);
     expect(deck.length).toBeGreaterThan(108);
   });
@@ -229,5 +231,65 @@ describe('時間到', () => {
     autoMove(state);
     expect(state.players[1].hand).toHaveLength(5);
     expect(state.turn).toBe(2);
+  });
+});
+
+describe('機器人代打', () => {
+  it('先出手上最多的顏色，萬用牌和 +99 留著', () => {
+    const red9 = card('number', 'red', 9);
+    const blue5 = card('number', 'blue', 5);
+    const state = setup([[card('draw99'), card('wild'), red9, blue5, card('number', 'blue', 1), card('number', 'blue', 2)], filler()]);
+    botMove(state);
+    expect(state.discardPile.at(-1)).toBe(blue5);
+    expect(state.currentColor).toBe('blue');
+    expect(state.turn).toBe(1);
+  });
+
+  it('只剩萬用牌能出，就選手上最多的顏色', () => {
+    const w = card('wild');
+    const state = setup([[w, card('number', 'green', 1), card('number', 'green', 2), card('number', 'blue', 7)], filler()]);
+    botMove(state);
+    expect(state.discardPile.at(-1)).toBe(w);
+    expect(state.currentColor).toBe('green');
+  });
+
+  it('沒牌能出就抽一張，抽到能出的下一步就出掉', () => {
+    const red7 = card('number', 'red', 7);
+    const state = setup([filler(), filler()]);
+    state.drawPile = [red7];
+    botMove(state);
+    expect(state.turn).toBe(0);
+    expect(state.hasDrawn).toBe(true);
+    botMove(state);
+    expect(state.discardPile.at(-1)).toBe(red7);
+    expect(state.turn).toBe(1);
+  });
+
+  it('抽到的還是不能出就換人', () => {
+    const state = setup([filler(), filler()]);
+    state.drawPile = [card('number', 'green', 8)];
+    botMove(state);
+    expect(state.players[0].hand).toHaveLength(4);
+    expect(state.turn).toBe(1);
+  });
+
+  it('疊加中能接就接，不能接就吃下整疊', () => {
+    const d2 = card('draw2', 'red');
+    const d2b = card('draw2', 'blue');
+    const state = setup([[d2, ...filler()], [d2b, ...filler()], filler()]);
+    playCard(state, 'p0', { cardId: d2.id });
+    botMove(state);
+    expect(state.discardPile.at(-1)).toBe(d2b);
+    expect(state.pendingDraw).toBe(4);
+    botMove(state);
+    expect(state.players[2].hand).toHaveLength(7);
+    expect(state.pendingDraw).toBe(0);
+  });
+
+  it('剩兩張出牌前會先喊 UNO', () => {
+    const state = setup([[card('number', 'red', 9), card('number', 'blue', 1)], filler()]);
+    botMove(state);
+    expect(state.players[0].hand).toHaveLength(1);
+    expect(state.players[0].unoSafe).toBe(true);
   });
 });

@@ -14,8 +14,14 @@ export type GameEvent =
   | { t: 'out'; id: string }
   | { t: 'uno'; id: string }
   | { t: 'caught' }
-  | { t: 'timeout' }
+  | { t: 'timeout'; id: string }
   | { t: 'yourTurn' }
+  /** 斷線了，機器人接手 */
+  | { t: 'offline'; id: string }
+  /** 斷線的人回來了 */
+  | { t: 'online'; id: string }
+  /** 自己在遊戲中途（重新）連進來 */
+  | { t: 'rejoin' }
   | { t: 'end'; winnerId: string | null };
 
 export function diffViews(prev: RoomView | null, next: RoomView): GameEvent[] {
@@ -23,7 +29,9 @@ export function diffViews(prev: RoomView | null, next: RoomView): GameEvent[] {
   const b = next.game;
   if (!b) return [];
   if (!a || (a.phase === 'ended' && b.phase === 'playing')) {
-    return b.turnId === next.you ? [{ t: 'start' }, { t: 'yourTurn' }] : [{ t: 'start' }];
+    // 紀錄不只「遊戲開始」那一行 = 已經打了一陣子，是中途連進來的
+    const first: GameEvent = !a && b.log.length > 1 ? { t: 'rejoin' } : { t: 'start' };
+    return b.turnId === next.you && b.phase === 'playing' ? [first, { t: 'yourTurn' }] : [first];
   }
 
   const events: GameEvent[] = [];
@@ -48,12 +56,19 @@ export function diffViews(prev: RoomView | null, next: RoomView): GameEvent[] {
     if (p.unoSafe && !old.unoSafe) events.push({ t: 'uno', id: p.id });
   }
 
+  // 座位的連線狀態：遊戲中有人斷線（機器人接手）或回來
+  for (const seat of next.seats) {
+    const old = prev!.seats.find((s) => s.id === seat.id);
+    if (!old || old.connected === seat.connected || !b.players.some((p) => p.id === seat.id && !p.out)) continue;
+    events.push({ t: seat.connected ? 'online' : 'offline', id: seat.id });
+  }
+
   for (const line of newLines(a.log, b.log)) {
     const roll = line.match(/🎲 骰出了 (\d+)/);
     if (roll) events.push({ t: 'dice', roll: Number(roll[1]) });
     else if (line.startsWith('🪞')) events.push({ t: 'mirror' });
     else if (line.startsWith('🚨')) events.push({ t: 'caught' });
-    else if (line.startsWith('⏰')) events.push({ t: 'timeout' });
+    else if (line.startsWith('⏰')) events.push({ t: 'timeout', id: a.turnId });
   }
 
   if (a.phase === 'playing' && b.phase === 'ended') events.push({ t: 'end', winnerId: b.winnerId });

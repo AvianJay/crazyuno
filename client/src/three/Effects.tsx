@@ -3,7 +3,7 @@ import { useEffect, useMemo, useRef } from 'react';
 import * as THREE from 'three';
 import { COLOR_HEX, dotTexture } from './cardArt';
 import { onFx } from './fx';
-import { FOV, rig } from './layout';
+import { FOV, placeRig, rig } from './layout';
 
 const MAX_PARTICLES = 4000;
 
@@ -236,7 +236,6 @@ export function CameraRig({ aberration }: { aberration?: { current: { offset: TH
   const trauma = useRef(0);
   const chroma = useRef(0);
   const spin = useRef(-1);
-  const look = useMemo(() => new THREE.Vector3(), []);
 
   useEffect(
     () =>
@@ -249,12 +248,6 @@ export function CameraRig({ aberration }: { aberration?: { current: { offset: TH
   );
 
   useFrame((st, dt) => {
-    const aspect = st.size.width / st.size.height;
-    // 直的螢幕要拉遠、拉高才看得到整張桌子
-    const f = THREE.MathUtils.clamp(1.55 / aspect, 1, 2.1);
-    const dist = 11 * f;
-    const elev = THREE.MathUtils.degToRad(aspect < 1 ? 62 : 52);
-    const base = rig.base;
     let angle = 0;
     if (spin.current >= 0) {
       spin.current += dt / 1.8;
@@ -262,12 +255,8 @@ export function CameraRig({ aberration }: { aberration?: { current: { offset: TH
       angle = (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2) * Math.PI * 2;
       if (t >= 1) spin.current = -1;
     }
-    // 直的螢幕把桌子往上推，下面留給手牌
-    const lookZ = aspect < 1 ? 2.6 : 1.1;
-    base.position.set(Math.sin(angle) * Math.cos(elev) * dist, Math.sin(elev) * dist, lookZ + Math.cos(angle) * Math.cos(elev) * dist);
-    look.set(0, 0, lookZ);
-    base.lookAt(look);
-    base.updateMatrixWorld();
+    placeRig(st.size.width / st.size.height, angle);
+    const base = rig.base;
 
     camera.position.copy(base.position);
     camera.quaternion.copy(base.quaternion);

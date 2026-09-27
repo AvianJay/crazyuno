@@ -4,6 +4,7 @@ import {
   COLORS,
   type Card,
   type CardKind,
+  type Color,
   type GameSettings,
   type GameState,
   type GameView,
@@ -14,7 +15,8 @@ import {
 export class GameError extends Error {}
 
 export const DEFAULT_SETTINGS: GameSettings = {
-  crazyCards: ALL_CARDS.filter((d) => d.crazy).map((d) => d.kind),
+  // 預設是普通 UNO，怪牌讓房主自己在大廳打開
+  crazyCards: [],
   handLimit: 30,
   startingHand: 7,
   turnSeconds: 30,
@@ -283,6 +285,46 @@ export function autoMove(state: GameState, rng: Rng = Math.random): void {
   pushLog(state, `⏰ ${player.name} 時間到`);
   if (state.pendingDraw > 0 || !state.hasDrawn) drawAction(state, player.id, rng);
   if (state.phase === 'playing' && state.turnSeq === seq) passTurn(state, player.id);
+}
+
+/**
+ * 離線玩家由機器人代打：每呼叫一次走一步（出牌、抽牌或跳過），伺服器隔一下再叫下一步，看起來才像有人在玩。
+ * 策略很簡單：先出手上最多的那個顏色的牌，萬用牌留著，+99 留到最後；選顏色就選手上最多的顏色。
+ */
+export function botMove(state: GameState, rng: Rng = Math.random): void {
+  if (state.phase !== 'playing') return;
+  const player = state.players[state.turn];
+  const options = player.hand.filter((c) => canPlay(state, c));
+  if (options.length === 0) {
+    if (state.hasDrawn && state.pendingDraw === 0) passTurn(state, player.id);
+    else drawAction(state, player.id, rng);
+    return;
+  }
+
+  const counts = colorCounts(player.hand);
+  const cost = (c: Card) => {
+    if (c.kind === 'draw99') return 1000;
+    if (getCardDef(c.kind).wild) return 500;
+    return -counts[c.color!];
+  };
+  const card = options.reduce((best, c) => (cost(c) < cost(best) ? c : best));
+  if (player.hand.length === 2 && !player.unoSafe) sayUno(state, player.id);
+  const color = getCardDef(card.kind).wild ? bestColor(player.hand.filter((c) => c !== card), rng) : undefined;
+  playCard(state, player.id, { cardId: card.id, color }, rng);
+}
+
+function colorCounts(hand: Card[]): Record<Color, number> {
+  const counts = { red: 0, yellow: 0, green: 0, blue: 0 };
+  for (const c of hand) if (c.color) counts[c.color]++;
+  return counts;
+}
+
+/** 手上最多的顏色（一樣多就隨便挑一個） */
+function bestColor(hand: Card[], rng: Rng): Color {
+  const counts = colorCounts(hand);
+  const max = Math.max(...COLORS.map((c) => counts[c]));
+  const best = COLORS.filter((c) => counts[c] === max);
+  return best[Math.floor(rng() * best.length)];
 }
 
 export function getView(state: GameState, viewerId: string): GameView {
