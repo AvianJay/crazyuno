@@ -1,0 +1,779 @@
+:root {
+  --red: #e5383b;
+  --yellow: #f4b400;
+  --green: #2bb673;
+  --blue: #2f7fe0;
+  --wild: #1b1b24;
+  --felt: #1d4d3a;
+  --felt-dark: #10301f;
+  --ink: #f5f3ea;
+  --muted: #b7c4bc;
+  --panel: rgba(0, 0, 0, 0.28);
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  margin: 0;
+  height: 100%;
+}
+
+body {
+  background: radial-gradient(ellipse at center, var(--felt) 0%, var(--felt-dark) 100%);
+  color: var(--ink);
+  font-family: 'Noto Sans TC', 'Microsoft JhengHei', system-ui, sans-serif;
+  overflow: hidden;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+
+.app {
+  height: 100%;
+  position: relative;
+}
+
+.center-msg {
+  display: grid;
+  place-items: center;
+  height: 100%;
+  font-size: 1.2rem;
+  padding: 16px;
+  text-align: center;
+}
+
+.banner {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  background: #b8860b;
+  text-align: center;
+  padding: 6px;
+  z-index: 50;
+}
+
+.toast {
+  position: fixed;
+  bottom: 38%;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(0, 0, 0, 0.85);
+  padding: 10px 18px;
+  border-radius: 999px;
+  z-index: 60;
+  animation: pop 0.2s ease-out;
+  max-width: calc(100% - 32px);
+  text-align: center;
+}
+
+/* ---------- 大廳 ---------- */
+
+.lobby {
+  height: 100%;
+  overflow-y: auto;
+  padding: 24px 16px 40px;
+  max-width: 720px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.title {
+  text-align: center;
+  font-size: 2.6rem;
+  margin: 8px 0;
+  letter-spacing: 0.05em;
+  transform: rotate(-3deg);
+}
+
+.title span {
+  display: inline-block;
+  background: var(--red);
+  color: var(--yellow);
+  padding: 0 14px;
+  border-radius: 12px;
+  border: 4px solid white;
+  font-style: italic;
+  text-shadow: 3px 3px 0 #000;
+}
+
+.panel {
+  background: var(--panel);
+  border-radius: 14px;
+  padding: 14px 16px;
+}
+
+.panel h2 {
+  margin: 0 0 10px;
+  font-size: 1.05rem;
+  color: var(--muted);
+}
+
+.seats {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.seats li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(255, 255, 255, 0.08);
+  padding: 6px 12px 6px 6px;
+  border-radius: 999px;
+}
+
+.seats li.offline {
+  opacity: 0.4;
+}
+
+.seats em {
+  font-style: normal;
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+.avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  display: inline-grid;
+  place-items: center;
+  font-weight: bold;
+  flex-shrink: 0;
+  object-fit: cover;
+}
+
+.crazy-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 8px;
+}
+
+.crazy-list label {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 2px 8px;
+  padding: 10px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 2px solid transparent;
+  cursor: pointer;
+  align-content: start;
+}
+
+.crazy-list label.on {
+  border-color: var(--yellow);
+  background: rgba(244, 180, 0, 0.12);
+}
+
+.crazy-list small {
+  grid-column: 2;
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.numbers {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.number-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.number-field input {
+  width: 110px;
+  padding: 6px 8px;
+  border-radius: 8px;
+  border: none;
+  font: inherit;
+  font-size: 1rem;
+}
+
+.big-btn {
+  background: var(--yellow);
+  color: #222;
+  border: none;
+  border-radius: 14px;
+  padding: 14px 28px;
+  font-size: 1.2rem;
+  font-weight: bold;
+  box-shadow: 0 4px 0 #a37800;
+}
+
+.big-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.waiting {
+  text-align: center;
+  color: var(--muted);
+}
+
+/* ---------- 3D 牌桌 ---------- */
+
+.table3d {
+  position: relative;
+  height: 100%;
+  overflow: hidden;
+  background: #05060b;
+  --glow: var(--yellow);
+}
+
+.table3d.color-red {
+  --glow: var(--red);
+}
+.table3d.color-yellow {
+  --glow: var(--yellow);
+}
+.table3d.color-green {
+  --glow: var(--green);
+}
+.table3d.color-blue {
+  --glow: var(--blue);
+}
+
+.table3d .scene {
+  position: absolute !important;
+  inset: 0;
+  touch-action: none;
+}
+
+/* drei 的 Html 標籤都掛在這層，跟 canvas 一樣大 */
+.labels3d {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 2;
+}
+
+/* 輪到自己：畫面邊緣發光 */
+.table3d::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  transition: box-shadow 0.4s;
+  z-index: 5;
+}
+
+.table3d.my-turn::after {
+  box-shadow: inset 0 0 50px 6px var(--glow);
+  animation: edge-pulse 1.4s ease-in-out infinite;
+}
+
+.hud-top {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 10px 12px;
+  pointer-events: none;
+  z-index: 10;
+}
+
+.log3d {
+  font-size: 0.78rem;
+  color: var(--muted);
+  max-width: min(340px, 34vw);
+  text-shadow: 0 1px 3px #000;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.log3d div {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  opacity: 0.6;
+}
+
+.log3d div:last-child {
+  color: var(--ink);
+  opacity: 1;
+}
+
+.hud-right {
+  margin-left: auto;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  pointer-events: auto;
+}
+
+.icon-btn {
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 50%;
+  width: 40px;
+  height: 40px;
+  font-size: 1.1rem;
+  backdrop-filter: blur(6px);
+}
+
+.timer {
+  font-variant-numeric: tabular-nums;
+  background: rgba(0, 0, 0, 0.45);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  padding: 6px 12px;
+  border-radius: 999px;
+  font-weight: bold;
+}
+
+.timer.hurry {
+  background: var(--red);
+  animation: pulse 0.5s infinite;
+}
+
+.hud-bottom {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 0 16px 12px;
+  pointer-events: none;
+  z-index: 10;
+}
+
+.turn-pill {
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(0, 0, 0, 0.5);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  backdrop-filter: blur(6px);
+  padding: 6px 16px;
+  border-radius: 999px;
+  font-weight: bold;
+  font-size: 0.95rem;
+  white-space: nowrap;
+  max-width: calc(100% - 140px);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  z-index: 11;
+}
+
+.turn-pill.mine {
+  background: var(--glow);
+  color: #111;
+  box-shadow: 0 0 24px var(--glow);
+}
+
+/* 窄螢幕沒位置放紀錄 */
+@media (max-width: 700px) {
+  .log3d {
+    display: none;
+  }
+
+  .turn-pill {
+    left: 12px;
+    transform: none;
+  }
+}
+
+.actions {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  pointer-events: auto;
+}
+
+.actions button {
+  background: rgba(10, 12, 20, 0.7);
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  backdrop-filter: blur(6px);
+  border-radius: 14px;
+  padding: 10px 20px;
+  font-weight: bold;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
+  transition: transform 0.1s;
+}
+
+.actions button:active {
+  transform: scale(0.94);
+}
+
+.actions .uno-btn {
+  background: var(--red);
+  border-color: white;
+  font-style: italic;
+  font-weight: 900;
+}
+
+.actions .uno-btn.ready {
+  animation: pulse 0.8s infinite;
+  background: var(--yellow);
+  color: #222;
+  box-shadow: 0 0 24px var(--yellow);
+}
+
+/* 對手座位（3D 裡的 HTML 標籤） */
+.seat3d {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  min-width: 72px;
+  padding: 6px 8px;
+  border-radius: 14px;
+  background: rgba(0, 0, 0, 0.55);
+  border: 2px solid rgba(255, 255, 255, 0.12);
+  backdrop-filter: blur(4px);
+  transition:
+    border-color 0.3s,
+    box-shadow 0.3s,
+    transform 0.3s;
+  pointer-events: none;
+  user-select: none;
+}
+
+.seat3d.active {
+  border-color: var(--glow);
+  box-shadow: 0 0 20px var(--glow);
+  transform: scale(1.12);
+}
+
+.seat3d.out {
+  filter: grayscale(1);
+  opacity: 0.45;
+}
+
+.seat3d .avatar {
+  width: 32px;
+  height: 32px;
+}
+
+.seat-name {
+  font-size: 0.8rem;
+  max-width: 90px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.seat-count {
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+.uno-badge {
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  background: var(--red);
+  font-size: 0.7rem;
+  font-weight: bold;
+  padding: 1px 5px;
+  border-radius: 6px;
+  transform: rotate(10deg);
+  box-shadow: 0 0 10px var(--red);
+}
+
+.catch-btn {
+  pointer-events: auto;
+  background: var(--red);
+  border: none;
+  border-radius: 8px;
+  padding: 2px 10px;
+  font-weight: bold;
+  margin-top: 2px;
+  animation: shake 0.4s infinite;
+  box-shadow: 0 0 14px var(--red);
+}
+
+.pile-count {
+  font-size: 0.75rem;
+  color: var(--muted);
+  background: rgba(0, 0, 0, 0.5);
+  padding: 0 6px;
+  border-radius: 6px;
+  pointer-events: none;
+}
+
+.pending3d {
+  font-weight: 900;
+  font-style: italic;
+  color: #ff4f4f;
+  -webkit-text-stroke: 2px #fff;
+  paint-order: stroke fill;
+  text-shadow:
+    0 0 12px #ff0000,
+    0 0 30px #ff0000;
+  animation: pulse 0.6s ease-in-out infinite;
+  pointer-events: none;
+  white-space: nowrap;
+}
+
+/* ---------- 特效大字 ---------- */
+
+.fx-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 30;
+  overflow: hidden;
+}
+
+.flash {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle, var(--c) 0%, transparent 75%);
+  opacity: 0;
+  mix-blend-mode: screen;
+  animation: flash 0.6s ease-out;
+}
+
+.slam {
+  position: absolute;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: clamp(2.2rem, 9vw, 5rem);
+  font-weight: 900;
+  font-style: italic;
+  white-space: nowrap;
+  color: var(--c);
+  -webkit-text-stroke: 2px #000;
+  paint-order: stroke fill;
+  text-shadow:
+    0 0 18px var(--c),
+    0 6px 0 rgba(0, 0, 0, 0.6);
+  animation: slam 1.7s cubic-bezier(0.2, 1.4, 0.4, 1) forwards;
+}
+
+.slam.danger {
+  --c: #ff3030;
+  font-size: clamp(3rem, 18vw, 10rem);
+  color: #fff;
+  text-shadow:
+    0 0 20px #ff0000,
+    0 0 60px #ff0000,
+    4px 4px 0 #ff0000,
+    -4px -4px 0 #00e5ff;
+  animation:
+    slam 1.7s cubic-bezier(0.2, 1.4, 0.4, 1) forwards,
+    glitch 0.12s steps(2) 6;
+}
+
+.slam.uno {
+  --c: #ffc400;
+  font-size: clamp(3rem, 16vw, 8rem);
+  color: var(--yellow);
+  -webkit-text-stroke: 3px var(--red);
+  text-shadow:
+    0 0 30px #ffc400,
+    6px 6px 0 var(--red);
+}
+
+.slam.gold {
+  --c: #ffd34d;
+  background: linear-gradient(180deg, #fff6c2, #ffc21a 50%, #b36b00);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  -webkit-text-stroke: 0;
+  filter: drop-shadow(0 0 16px #ffae00) drop-shadow(0 4px 0 #000);
+  text-shadow: none;
+}
+
+.slam .emoji {
+  color: #fff;
+  -webkit-text-stroke: 0;
+  font-style: normal;
+}
+
+/* 選顏色時不要把整個畫面蓋暗，才看得到選中的牌 */
+.overlay.clear {
+  background: rgba(0, 0, 0, 0.25);
+  place-items: end center;
+  padding-bottom: 38vh;
+}
+
+.overlay .color-picker {
+  background: rgba(12, 14, 24, 0.85);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  backdrop-filter: blur(10px);
+}
+
+.swatch {
+  box-shadow: 0 0 18px currentColor;
+  transition: transform 0.1s;
+}
+
+.swatch:hover {
+  transform: scale(1.08);
+}
+
+/* ---------- 彈出視窗 ---------- */
+
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: grid;
+  place-items: center;
+  z-index: 40;
+  padding: 16px;
+}
+
+.color-picker,
+.result {
+  background: #1a2a22;
+  border-radius: 18px;
+  padding: 20px;
+  text-align: center;
+  animation: pop 0.2s ease-out;
+}
+
+.color-picker div {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.swatch {
+  width: 96px;
+  height: 72px;
+  border-radius: 14px;
+  border: 3px solid white;
+  font-size: 1.3rem;
+  font-weight: bold;
+}
+
+.swatch.red {
+  background: var(--red);
+}
+.swatch.yellow {
+  background: var(--yellow);
+  color: #222;
+}
+.swatch.green {
+  background: var(--green);
+}
+.swatch.blue {
+  background: var(--blue);
+}
+
+.result h2 {
+  font-size: 1.8rem;
+  margin: 0 0 16px;
+}
+
+.result-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  align-items: center;
+}
+
+.result-actions button:not(.big-btn) {
+  background: none;
+  border: none;
+  color: var(--muted);
+  text-decoration: underline;
+}
+
+/* ---------- 手機 ---------- */
+
+@media (max-width: 600px) {
+  .title {
+    font-size: 2rem;
+  }
+}
+
+@keyframes pop {
+  from {
+    transform: scale(0.85);
+    opacity: 0;
+  }
+}
+
+@keyframes pulse {
+  50% {
+    transform: scale(1.1);
+  }
+}
+
+@keyframes shake {
+  25% {
+    transform: rotate(-6deg);
+  }
+  75% {
+    transform: rotate(6deg);
+  }
+}
+
+@keyframes edge-pulse {
+  50% {
+    opacity: 0.55;
+  }
+}
+
+@keyframes flash {
+  0% {
+    opacity: var(--s);
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes slam {
+  0% {
+    transform: translate(-50%, -50%) scale(3.2) rotate(-12deg);
+    opacity: 0;
+  }
+  14% {
+    transform: translate(-50%, -50%) scale(1) rotate(-4deg);
+    opacity: 1;
+  }
+  75% {
+    transform: translate(-50%, -50%) scale(1.06) rotate(-4deg);
+    opacity: 1;
+  }
+  100% {
+    transform: translate(-50%, -80%) scale(0.9) rotate(-4deg);
+    opacity: 0;
+  }
+}
+
+@keyframes glitch {
+  50% {
+    margin-left: 8px;
+    filter: hue-rotate(90deg);
+  }
+}

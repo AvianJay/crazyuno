@@ -1,0 +1,15 @@
+{
+  "name": "crazyuno",
+  "private": true,
+  "workspaces": ["shared", "server", "client"],
+  "scripts": {
+    "dev": "concurrently -n server,client -c magenta,cyan \"npm run dev -w server\" \"npm run dev -w client\"",
+    "test": "npm test -w shared",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "build": "npm run build -w client"
+  },
+  "devDependencies": {
+    "concurrently": "^10.0.5",
+    "typescript": "~5.9.3"
+  }
+}
