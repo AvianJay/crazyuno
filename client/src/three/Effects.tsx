@@ -5,10 +5,10 @@ import { COLOR_HEX, dotTexture } from './cardArt';
 import { onFx } from './fx';
 import { FOV, placeRig, rig } from './layout';
 
-const MAX_PARTICLES = 4000;
-
-/** 所有粒子共用一個 Points，用環狀緩衝區循環使用 */
-export function Particles() {
+/** 所有粒子共用一個 Points，用環狀緩衝區循環使用。density < 1 會把每次噴的數量打折（省電模式） */
+export function Particles({ max = 4000, density = 1 }: { max?: number; density?: number }) {
+  const MAX_PARTICLES = max;
+  const points = useRef<THREE.Points>(null!);
   const { geo, mat, sim } = useMemo(() => {
     const geo = new THREE.BufferGeometry();
     geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(MAX_PARTICLES * 3), 3));
@@ -49,9 +49,11 @@ export function Particles() {
       gravity: new Float32Array(MAX_PARTICLES),
       drag: new Float32Array(MAX_PARTICLES),
       next: 0,
+      /** 有沒有還活著的粒子；沒有的話每一格都不用算、不用上傳 */
+      active: false,
     };
     return { geo, mat, sim };
-  }, []);
+  }, [MAX_PARTICLES]);
 
   const size = useThree((s) => s.size);
   const dpr = useThree((s) => s.viewport.dpr);
@@ -83,11 +85,13 @@ export function Particles() {
       sim.size[i] = sz * (0.5 + Math.random());
       sim.gravity[i] = gravity;
       sim.drag[i] = drag;
+      sim.active = true;
     };
 
     return onFx((e) => {
       if (e.kind === 'burst') {
-        for (let n = 0; n < e.count; n++) {
+        const count = Math.round(e.count * density);
+        for (let n = 0; n < count; n++) {
           // 球面上隨機方向，往上多噴一點
           const u = Math.random() * 2 - 1;
           const a = Math.random() * Math.PI * 2;
@@ -105,7 +109,8 @@ export function Particles() {
         }
       } else if (e.kind === 'confetti') {
         const colors = Object.values(COLOR_HEX);
-        for (let n = 0; n < e.count; n++) {
+        const count = Math.round(e.count * density);
+        for (let n = 0; n < count; n++) {
           spawn(
             [(Math.random() - 0.5) * 14, 4 + Math.random() * 3, (Math.random() - 0.5) * 8 - 1],
             [(Math.random() - 0.5) * 2, -Math.random() * 2, (Math.random() - 0.5) * 2],
@@ -118,10 +123,13 @@ export function Particles() {
         }
       }
     });
-  }, [geo, sim]);
+  }, [geo, sim, density]);
 
   useFrame((_, rawDt) => {
+    points.current.visible = sim.active;
+    if (!sim.active) return;
     const dt = Math.min(rawDt, 0.05);
+    let alive = false;
     const pos = geo.attributes.position.array as Float32Array;
     const col = geo.attributes.color.array as Float32Array;
     const sz = geo.attributes.size.array as Float32Array;
@@ -131,6 +139,7 @@ export function Particles() {
         continue;
       }
       sim.life[i] -= dt;
+      alive = true;
       const t = Math.max(0, sim.life[i] / sim.maxLife[i]);
       const j = i * 3;
       const drag = Math.exp(-sim.drag[i] * dt);
@@ -153,9 +162,10 @@ export function Particles() {
     geo.attributes.position.needsUpdate = true;
     geo.attributes.color.needsUpdate = true;
     geo.attributes.size.needsUpdate = true;
+    sim.active = alive;
   });
 
-  return <points geometry={geo} material={mat} frustumCulled={false} />;
+  return <points ref={points} geometry={geo} material={mat} frustumCulled={false} />;
 }
 
 const RING_POOL = 12;

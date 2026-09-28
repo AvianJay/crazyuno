@@ -110,6 +110,44 @@ export const TimerIcon = (p: P) => (
   </Svg>
 );
 
+/** 隱私權 */
+export const ShieldIcon = (p: P) => (
+  <Svg {...p}>
+    <path d="M12 2l8 3v6c0 5-3.5 9-8 11-4.5-2-8-6-8-11V5z" fill="currentColor" fillOpacity={0.3} />
+    <path d="M8.5 12l2.5 2.5 4.5-5" />
+  </Svg>
+);
+
+/** 服務條款 */
+export const DocIcon = (p: P) => (
+  <Svg {...p}>
+    <path d="M6 2h9l5 5v15H6z" fill="currentColor" fillOpacity={0.3} />
+    <path d="M15 2v5h5M9 12h8M9 16h8" />
+  </Svg>
+);
+
+export const CloseIcon = (p: P) => (
+  <Svg {...p} strokeWidth={3}>
+    <path d="M6 6l12 12M18 6L6 18" />
+  </Svg>
+);
+
+/** 高畫質 */
+export const SparkleIcon = (p: P) => (
+  <Svg {...p}>
+    <path d="M12 2l2.2 6.3L20 10l-5.8 1.9L12 18l-2.2-6.1L4 10l5.8-1.7z" fill="currentColor" />
+    <path d="M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z" fill="currentColor" />
+  </Svg>
+);
+
+/** 省電畫質 */
+export const LeafIcon = (p: P) => (
+  <Svg {...p}>
+    <path d="M5 19c0-9 6-14 15-14 0 9-5 15-14 15" fill="currentColor" fillOpacity={0.35} />
+    <path d="M4 20c4-5 7-8 11-10" />
+  </Svg>
+);
+
 /** 離線的人由機器人代打 */
 export const RobotIcon = (p: P) => (
   <Svg {...p}>

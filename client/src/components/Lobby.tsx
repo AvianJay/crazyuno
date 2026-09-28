@@ -18,6 +18,7 @@ import {
   PlusIcon,
   TimerIcon,
 } from './icons';
+import { LegalLinks } from './Legal';
 import { FloatingCards } from './Loader';
 
 /** 大廳裡怪牌用哪個顏色的樣子展示（萬用牌是黑的） */
@@ -155,6 +156,8 @@ export function Lobby({ view, send }: { view: RoomView; send: Send }) {
             <HourglassIcon className="spin-slow" />
           </div>
         )}
+
+        <LegalLinks />
       </div>
     </div>
   );

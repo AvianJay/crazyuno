@@ -1,6 +1,6 @@
 import { getCardDef, type Card, type Color, type GameView, type RoomView } from '@crazyuno/shared';
 import { Canvas } from '@react-three/fiber';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import * as THREE from 'three';
 import type { Send } from '../App';
 import { faceImage } from '../cardFace';
@@ -10,6 +10,7 @@ import { diffViews, type GameEvent } from '../three/events';
 import { emitFx } from '../three/fx';
 import { FxLayer } from '../three/FxLayer';
 import { FOV, seatMap } from '../three/layout';
+import { chooseQuality, initialQuality, rememberAutoLow, type QualityState } from '../three/quality';
 import { Scene } from '../three/Scene';
 import { Avatar } from './Avatar';
 import {
@@ -18,12 +19,14 @@ import {
   EyeIcon,
   GearIcon,
   HourglassIcon,
+  LeafIcon,
   MuteIcon,
   PassIcon,
   ReplayIcon,
   RobotIcon,
   SirenIcon,
   SkullIcon,
+  SparkleIcon,
   SpeakerIcon,
   TimerIcon,
   TrophyIcon,
@@ -66,6 +69,7 @@ export function Table({ view, game, send }: { view: RoomView; game: GameView; se
   const [wild, setWild] = useState<{ card: Card; chosen: boolean } | null>(null);
   const [muted, setMuted] = useState(sfx.isMuted());
   const [feed, setFeed] = useState<FeedItem[]>([]);
+  const [quality, setQuality] = useState<QualityState>(initialQuality);
   const labels = useRef<HTMLDivElement>(null!);
   const secondsLeft = useCountdown(view.turnMsLeft, game.turnId);
 
@@ -134,6 +138,22 @@ export function Table({ view, game, send }: { view: RoomView; game: GameView; se
     setWild({ ...wild, chosen: true });
   };
 
+  // 跑不動或顯示卡記憶體不夠：自動換成省電（玩家自己選過高畫質就尊重他，除非 WebGL 真的掛了）
+  const onSlow = useCallback(() => {
+    setQuality((q) => {
+      if (q.userChosen || q.quality === 'low') return q;
+      console.warn('[crazyuno-perf] 太慢了，自動換成省電畫質');
+      rememberAutoLow();
+      return { quality: 'low', userChosen: false };
+    });
+  }, []);
+  const onContextLost = useCallback(() => {
+    setQuality((q) => {
+      if (!q.userChosen) rememberAutoLow();
+      return { quality: 'low', userChosen: q.userChosen };
+    });
+  }, []);
+
   const turnPlayer = playerOf(game.turnId);
   /** 離線（機器人代打中） */
   const isBot = (id: string) => !view.seats.find((s) => s.id === id)?.connected;
@@ -143,9 +163,11 @@ export function Table({ view, game, send }: { view: RoomView; game: GameView; se
     <div className={`table3d color-${game.currentColor} ${myTurn ? 'my-turn' : ''}`}>
       <Canvas
         className="scene"
-        dpr={[1, 2]}
+        // 省電模式固定 1 倍解析度（高解析度手機要畫的像素少一大半）
+        dpr={quality.quality === 'high' ? [1, 2] : 1}
         camera={{ fov: FOV, near: 0.1, far: 80, position: [0, 9, 8] }}
-        gl={{ antialias: false, powerPreference: 'high-performance', stencil: false, toneMapping: THREE.NeutralToneMapping }}
+        // alpha: false = 不透明的畫布：手機合成畫面比較省，也不會有透明的一格露出後面的黑底
+        gl={{ alpha: false, antialias: false, powerPreference: 'high-performance', stencil: false, toneMapping: THREE.NeutralToneMapping }}
         onPointerMissed={() => {
           if (wild && !wild.chosen) setWild(null);
         }}
@@ -165,6 +187,9 @@ export function Table({ view, game, send }: { view: RoomView; game: GameView; se
           }}
           onCatch={(targetId) => send('catch', { targetId })}
           labels={labels}
+          quality={quality.quality}
+          onSlow={onSlow}
+          onContextLost={onContextLost}
         />
       </Canvas>
       <div className="labels3d" ref={labels} />
@@ -194,6 +219,18 @@ export function Table({ view, game, send }: { view: RoomView; game: GameView; se
         {secondsLeft !== null && game.phase === 'playing' && (
           <TimerRing left={secondsLeft} total={view.settings.turnSeconds} />
         )}
+        <button
+          className={`icon-btn ${quality.quality === 'low' ? 'eco' : ''}`}
+          aria-label={quality.quality === 'high' ? '高畫質（點一下換省電）' : '省電畫質（點一下換高畫質）'}
+          title={quality.quality === 'high' ? '高畫質' : '省電畫質'}
+          onClick={() => {
+            const next = quality.quality === 'high' ? 'low' : 'high';
+            chooseQuality(next);
+            setQuality({ quality: next, userChosen: true });
+          }}
+        >
+          {quality.quality === 'high' ? <SparkleIcon /> : <LeafIcon />}
+        </button>
         <button
           className="icon-btn"
           aria-label={muted ? '開聲音' : '靜音'}

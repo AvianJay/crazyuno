@@ -11,6 +11,7 @@ import { backTexture, CARD_H, CARD_W, COLOR_HEX, feltTexture, glowTexture } from
 import { CardMesh, FACE_DOWN, FACE_UP, pose, type Pose } from './CardMesh';
 import { CameraRig, Particles, Shockwaves } from './Effects';
 import type { GameEvent } from './events';
+import type { Quality } from './quality';
 import {
   DECK_TILT,
   deckSlot,
@@ -42,12 +43,16 @@ interface Props {
   onCatch(targetId: string): void;
   /** 3D 裡的 HTML 標籤掛在這個 div 上 */
   labels: RefObject<HTMLElement>;
+  quality: Quality;
+  /** 一直跑不動（每秒不到 50 格） */
+  onSlow(): void;
+  /** 顯示卡記憶體不夠，瀏覽器把 WebGL 收回去了 */
+  onContextLost(): void;
 }
 
 export function Scene(props: Props) {
   const { view, game, labels } = props;
-  const [hq, setHq] = useState(true);
-  const setDpr = useThree((s) => s.setDpr);
+  const hq = props.quality === 'high';
   const size = useThree((s) => s.size);
   const aberration = useRef<ChromaticAberrationEffect>(null);
   const aspect = size.width / size.height;
@@ -60,14 +65,9 @@ export function Scene(props: Props) {
     <>
       <color attach="background" args={['#05060b']} />
       <fog attach="fog" args={['#05060b', 16, 34]} />
-      <PerformanceMonitor
-        onDecline={() => {
-          // 手機跑不動就關掉後製、降解析度（網址加 ?hq 強制全開）
-          if (FORCE_HQ) return;
-          setHq(false);
-          setDpr(1);
-        }}
-      />
+      {/* 高畫質跑不動就通知外面降成省電 */}
+      {hq && <PerformanceMonitor onDecline={props.onSlow} />}
+      <GpuWatch quality={props.quality} onContextLost={props.onContextLost} />
       <CameraRig aberration={aberration} />
 
       <ambientLight intensity={0.5} />
@@ -80,7 +80,9 @@ export function Scene(props: Props) {
       </Environment>
 
       <TableModel color={game.currentColor} direction={game.direction} />
-      <Sparkles count={70} scale={[16, 5, 12]} position={[0, 2.5, 0]} size={3} speed={0.35} opacity={0.6} color={COLOR_HEX[game.currentColor]} />
+      {hq && (
+        <Sparkles count={70} scale={[16, 5, 12]} position={[0, 2.5, 0]} size={3} speed={0.35} opacity={0.6} color={COLOR_HEX[game.currentColor]} />
+      )}
 
       <Deck
         labels={labels}
@@ -137,11 +139,12 @@ export function Scene(props: Props) {
         </div>
       </Html>
 
-      <Particles />
+      <Particles key={props.quality} max={hq ? 4000 : 1500} density={hq ? 1 : 0.4} />
       <Shockwaves />
 
       {hq ? (
-        <EffectComposer multisampling={4}>
+        // 手機不開 MSAA：Adreno 之類的手機顯示卡在多重取樣的浮點緩衝上會一閃一閃，手機解析度高鋸齒也看不太出來
+        <EffectComposer multisampling={IS_MOBILE ? 0 : 4}>
           <Bloom mipmapBlur luminanceThreshold={0.9} luminanceSmoothing={0.2} intensity={1.1} />
           <ChromaticAberration ref={aberration} offset={new THREE.Vector2(0, 0)} radialModulation={false} modulationOffset={0} />
           <Vignette offset={0.25} darkness={0.75} />
@@ -152,7 +155,67 @@ export function Scene(props: Props) {
   );
 }
 
-const FORCE_HQ = new URLSearchParams(location.search).has('hq');
+const IS_MOBILE = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) || matchMedia('(pointer: coarse)').matches;
+
+/**
+ * 盯著顯示卡：WebGL 被瀏覽器收回（context lost）時通知外面降畫質；
+ * 開發模式下把這支裝置的顯示卡、每秒格數寫進 console（Vite 會轉到伺服器的記錄檔，查舊手機的問題用）。
+ */
+function GpuWatch({ quality, onContextLost }: { quality: Quality; onContextLost(): void }) {
+  const gl = useThree((s) => s.gl);
+  const frames = useRef(0);
+  useFrame(() => {
+    frames.current++;
+  });
+
+  useEffect(() => {
+    const canvas = gl.domElement;
+    const lost = () => {
+      console.warn('[crazyuno-perf] WebGL context lost');
+      onContextLost();
+    };
+    const restored = () => console.warn('[crazyuno-perf] WebGL context restored');
+    canvas.addEventListener('webglcontextlost', lost);
+    canvas.addEventListener('webglcontextrestored', restored);
+    return () => {
+      canvas.removeEventListener('webglcontextlost', lost);
+      canvas.removeEventListener('webglcontextrestored', restored);
+    };
+  }, [gl, onContextLost]);
+
+  useEffect(() => {
+    if (!import.meta.env.DEV) return;
+    // 等開局的動畫跑完再量 5 秒
+    const start = setTimeout(() => {
+      frames.current = 0;
+      const t0 = performance.now();
+      const done = setTimeout(() => {
+        const ctx = gl.getContext();
+        const info = ctx.getExtension('WEBGL_debug_renderer_info');
+        console.warn(
+          '[crazyuno-perf] ' +
+            JSON.stringify({
+              fps: Math.round((frames.current * 1000) / (performance.now() - t0)),
+              quality,
+              dpr: gl.getPixelRatio(),
+              canvas: [ctx.drawingBufferWidth, ctx.drawingBufferHeight],
+              gpu: info ? ctx.getParameter(info.UNMASKED_RENDERER_WEBGL) : '?',
+              memory: (navigator as { deviceMemory?: number }).deviceMemory,
+              ua: navigator.userAgent,
+            }),
+        );
+      }, 5000);
+      cleanup.current = () => clearTimeout(done);
+    }, 4000);
+    const cleanup = { current: () => {} };
+    return () => {
+      clearTimeout(start);
+      cleanup.current();
+    };
+  }, [gl, quality]);
+
+  return null;
+}
 
 // ---------- 桌子 ----------
 

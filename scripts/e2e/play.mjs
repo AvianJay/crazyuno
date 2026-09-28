@@ -87,6 +87,15 @@ try {
       await sleep(1800);
     }
   }
+  // 畫質按鈕：切到省電再切回來
+  await host.eval(`document.querySelector('.hud-right .icon-btn').click()`);
+  await host.waitFor(`localStorage.getItem('crazyuno:quality') === 'low' && !!document.querySelector('.icon-btn.eco')`, 5000);
+  await sleep(4000);
+  await shot(host, 'eco');
+  console.log('省電畫質：', await host.eval(`(() => { const c = document.querySelector('.table3d canvas'); return c.width + 'x' + c.height; })()`));
+  await host.eval(`document.querySelector('.hud-right .icon-btn').click()`);
+  await host.waitFor(`localStorage.getItem('crazyuno:quality') === 'high'`, 5000);
+
   if (process.env.QUICK) {
     console.log('QUICK：只截開局畫面');
   } else {

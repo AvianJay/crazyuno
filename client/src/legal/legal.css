@@ -1,0 +1,378 @@
+/* 隱私權政策、服務條款共用的樣式：跟遊戲一樣的深色絨布 + 霓虹，但以好讀為主 */
+
+:root {
+  --red: #e5383b;
+  --yellow: #f4b400;
+  --green: #2bb673;
+  --blue: #2f7fe0;
+  --pink: #ff4fd8;
+  --cyan: #3ee0ff;
+  --ink: #f5f3ea;
+  --muted: #aebbb3;
+  --card: rgba(8, 10, 18, 0.82);
+  --line: rgba(255, 255, 255, 0.1);
+  --bounce: cubic-bezier(0.3, 1.6, 0.5, 1);
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background:
+    radial-gradient(circle at 15% 0%, rgba(255, 79, 216, 0.16), transparent 40%),
+    radial-gradient(circle at 90% 100%, rgba(62, 224, 255, 0.12), transparent 40%),
+    radial-gradient(ellipse at center, #1d4d3a 0%, #0b2419 100%) fixed;
+  color: var(--ink);
+  font-family: 'Noto Sans TC', 'Microsoft JhengHei', system-ui, sans-serif;
+  line-height: 1.75;
+  -webkit-text-size-adjust: 100%;
+}
+
+a {
+  color: var(--cyan);
+  text-underline-offset: 3px;
+}
+
+a:hover {
+  color: #fff;
+}
+
+code {
+  background: rgba(255, 255, 255, 0.1);
+  padding: 1px 6px;
+  border-radius: 6px;
+  font-size: 0.9em;
+}
+
+/* 背景飄的牌（legal.ts 放進來） */
+.floaters {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.floater {
+  position: absolute;
+  bottom: -160px;
+  border-radius: 6px;
+  opacity: 0.12;
+  animation: float-up linear infinite;
+}
+
+.page {
+  position: relative;
+  z-index: 1;
+  max-width: 780px;
+  margin: 0 auto;
+  padding: 24px 16px 56px;
+}
+
+/* ---------- 頂端 ---------- */
+
+.top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 20px;
+}
+
+.logo {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 1.5rem;
+  font-weight: 900;
+  text-decoration: none;
+  color: inherit;
+}
+
+.logo-crazy {
+  color: var(--pink);
+  text-shadow:
+    0 0 8px var(--pink),
+    0 0 18px var(--pink);
+}
+
+.logo-uno {
+  background: var(--red);
+  color: var(--yellow);
+  padding: 0 10px;
+  border-radius: 10px;
+  border: 3px solid #fff;
+  font-style: italic;
+  text-shadow: 2px 2px 0 #000;
+  rotate: -4deg;
+  animation: wobble 2.6s ease-in-out infinite;
+}
+
+.switches {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.pill-group {
+  display: flex;
+  background: rgba(0, 0, 0, 0.45);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 3px;
+}
+
+.pill-group a,
+.pill-group button {
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: bold;
+  color: var(--muted);
+  background: none;
+  border: none;
+  border-radius: 999px;
+  padding: 4px 12px;
+  cursor: pointer;
+  text-decoration: none;
+  transition:
+    background 0.2s,
+    color 0.2s;
+}
+
+.pill-group .on {
+  background: var(--yellow);
+  color: #222;
+}
+
+/* ---------- 標題 ---------- */
+
+.hero {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin: 8px 0 20px;
+  animation: drop-in 0.6s var(--bounce);
+}
+
+.hero-icon {
+  flex-shrink: 0;
+  width: 64px;
+  height: 64px;
+  border-radius: 18px;
+  display: grid;
+  place-items: center;
+  font-size: 2rem;
+  color: #fff;
+  background: linear-gradient(135deg, var(--pink), #7b5cff 50%, var(--cyan));
+  box-shadow: 0 0 24px rgba(255, 79, 216, 0.5);
+  animation: bob 2.4s ease-in-out infinite;
+}
+
+.hero h1 {
+  margin: 0;
+  font-size: clamp(1.6rem, 6vw, 2.2rem);
+  line-height: 1.2;
+}
+
+.hero .date {
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+/* ---------- 重點摘要 ---------- */
+
+.tldr {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 10px;
+  margin-bottom: 20px;
+}
+
+.tldr div {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 12px 14px;
+  font-size: 0.92rem;
+  line-height: 1.55;
+}
+
+.tldr svg {
+  flex-shrink: 0;
+  width: 26px;
+  height: 26px;
+  margin-top: 1px;
+}
+
+.tldr div:nth-child(1) svg {
+  color: var(--cyan);
+}
+.tldr div:nth-child(2) svg {
+  color: var(--green);
+}
+.tldr div:nth-child(3) svg {
+  color: var(--yellow);
+}
+
+/* ---------- 內文 ---------- */
+
+section.block {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  padding: 16px 20px;
+  margin-bottom: 14px;
+}
+
+section.block h2 {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 8px;
+  font-size: 1.15rem;
+  line-height: 1.4;
+}
+
+section.block h2 .n {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: 0.85rem;
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--yellow);
+}
+
+section.block p,
+section.block ul {
+  margin: 6px 0;
+}
+
+section.block ul {
+  padding-left: 1.3em;
+}
+
+section.block li {
+  margin: 4px 0;
+}
+
+.note {
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.trademark {
+  border-left: 4px solid var(--yellow);
+  padding: 6px 12px;
+  background: rgba(244, 180, 0, 0.08);
+  border-radius: 0 10px 10px 0;
+}
+
+/* 還沒在 .env 設定聯絡方式時的提醒 */
+.contact-missing {
+  color: #ff8a8a;
+  font-weight: bold;
+}
+
+footer {
+  margin-top: 28px;
+  text-align: center;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+/* 沒開 JS 的時候兩種語言都顯示；開了 JS 就只顯示選的那一種 */
+html.js [data-lang]:not(.active) {
+  display: none;
+}
+
+/* 捲到的區塊淡入（沒開 JS 就直接顯示） */
+html.js .reveal {
+  opacity: 0;
+  transform: translateY(24px);
+  transition:
+    opacity 0.5s ease-out,
+    transform 0.5s var(--bounce);
+}
+
+html.js .reveal.in {
+  opacity: 1;
+  transform: none;
+}
+
+/* 在遊戲裡的視窗打開（?embed）：不要背景飄的牌，頂端精簡 */
+html.embed body {
+  background: #0d1a14;
+}
+
+html.embed .floaters,
+html.embed .logo {
+  display: none;
+}
+
+html.embed .page {
+  padding-top: 14px;
+}
+
+html.embed .top {
+  padding-right: 48px;
+}
+
+@keyframes float-up {
+  to {
+    transform: translateY(-130vh) rotate(var(--spin));
+  }
+}
+
+@keyframes wobble {
+  50% {
+    rotate: 3deg;
+    scale: 1.05;
+  }
+}
+
+@keyframes bob {
+  50% {
+    translate: 0 -5px;
+  }
+}
+
+@keyframes drop-in {
+  from {
+    transform: translateY(-30px);
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+
+  .floaters {
+    display: none;
+  }
+
+  html.js .reveal {
+    opacity: 1;
+    transform: none;
+  }
+}
