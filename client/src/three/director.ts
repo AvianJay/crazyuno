@@ -12,7 +12,14 @@ const FIRE = ['#ffdd55', '#ff8a00', '#ff3b1f', '#ffffff'];
 const v = (p: THREE.Vector3, y = 0): Vec3 => [p.x, p.y + y, p.z];
 
 /** 把事件翻譯成音效和特效 */
-export function direct(events: GameEvent[], view: RoomView, game: GameView, seats: Map<string, THREE.Vector3>) {
+export function direct(
+  events: GameEvent[],
+  view: RoomView,
+  game: GameView,
+  seats: Map<string, THREE.Vector3>,
+  /** 3D 畫布的大小（手機版 Discord 會扣掉被蓋住的邊，不一定是整個視窗） */
+  size: { width: number; height: number },
+) {
   const name = (id: string) => (id === view.you ? '你' : (game.players.find((p) => p.id === id)?.name ?? '?'));
   const seat = (id: string) => seats.get(id) ?? MY_SEAT;
   const pile = v(DISCARD, 0.1);
@@ -23,7 +30,7 @@ export function direct(events: GameEvent[], view: RoomView, game: GameView, seat
       case 'start':
         sfx.shuffle();
         emitFx({ kind: 'text', text: '開局！', tone: 'gold' });
-        emitFx({ kind: 'burst', at: v(deckWorldPose(innerWidth / innerHeight, innerHeight).pos), colors: RAINBOW, count: 120, speed: 4, up: 3 });
+        emitFx({ kind: 'burst', at: v(deckWorldPose(size.width / size.height, size.height).pos), colors: RAINBOW, count: 120, speed: 4, up: 3 });
         break;
 
       case 'play': {

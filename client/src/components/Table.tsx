@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import * as THREE from 'three';
 import type { Send } from '../App';
 import { faceImage } from '../cardFace';
+import { formatCount } from '../count';
 import * as sfx from '../sfx';
 import { direct } from '../three/director';
 import { diffViews, type GameEvent } from '../three/events';
@@ -89,7 +90,8 @@ export function Table({ view, game, send }: { view: RoomView; game: GameView; se
   }, [view]);
   useEffect(() => {
     prev.current = view;
-    direct(events, view, game, seatMap(game, view.you, innerWidth / innerHeight));
+    const box = { width: labels.current.clientWidth || innerWidth, height: labels.current.clientHeight || innerHeight };
+    direct(events, view, game, seatMap(game, view.you, box.width / box.height), box);
     const add = events.map(toFeed).filter((f): f is FeedItem => f !== null);
     if (events.some((e) => e.t === 'start' || e.t === 'rejoin')) setFeed(add);
     else if (add.length) setFeed((f) => [...f, ...add].slice(-5));
@@ -202,7 +204,7 @@ export function Table({ view, game, send }: { view: RoomView; game: GameView; se
         ) : myTurn ? (
           <>
             <DownIcon className="pill-icon bob" />
-            {game.pendingDraw > 0 && <span className="pill-pending">+{game.pendingDraw}</span>}
+            {game.pendingDraw > 0 && <span className="pill-pending">+{formatCount(game.pendingDraw)}</span>}
           </>
         ) : me?.out ? (
           <SkullIcon className="pill-icon" />

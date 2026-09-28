@@ -8,6 +8,7 @@ import {
   CRAZY_KINDS,
   DEFAULT_SETTINGS,
   drawAction,
+  MAX_HAND,
   playCard,
   removePlayer,
   sayUno,
@@ -170,6 +171,22 @@ describe('+99 與爆牌', () => {
     playCard(state, 'p0', { cardId: p99.id, color: 'red' });
     drawAction(state, 'p1');
     expect(state.players[1].hand).toHaveLength(102);
+  });
+
+  it('不限手牌時疊到幾百億張也不會真的去抽，超過 MAX_HAND 直接爆牌', () => {
+    const x2 = card('double', 'red');
+    const state = setup([[x2, ...filler()], filler(), filler()], undefined, { handLimit: 0 });
+    state.pendingDraw = 28_354_413_749;
+    state.pendingFrom = 2;
+    playCard(state, 'p0', { cardId: x2.id });
+    expect(state.pendingDraw).toBe(56_708_827_498);
+    drawAction(state, 'p1');
+    expect(state.players[1].out).toBe(true);
+    expect(state.players[1].hand).toHaveLength(0);
+    expect(state.pendingDraw).toBe(0);
+    expect(state.turn).toBe(2);
+    // 牌堆只多出「撐爆那一手」的量，不是幾百億張
+    expect(state.drawPile.length).toBeLessThan(MAX_HAND * 2);
   });
 });
 

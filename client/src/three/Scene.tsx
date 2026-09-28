@@ -7,6 +7,7 @@ import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactEle
 import * as THREE from 'three';
 import { Avatar } from '../components/Avatar';
 import { DeckIcon, RobotIcon, SirenIcon, SkullIcon } from '../components/icons';
+import { formatCount } from '../count';
 import { backTexture, CARD_H, CARD_W, COLOR_HEX, feltTexture, glowTexture } from './cardArt';
 import { CardMesh, FACE_DOWN, FACE_UP, pose, type Pose } from './CardMesh';
 import { CameraRig, Particles, Shockwaves } from './Effects';
@@ -118,9 +119,7 @@ export function Scene(props: Props) {
       {/* Html 一直掛著，只換內容：drei 的 Html 卸載時會跟 React 19 打架 */}
       <Html portal={labels} position={[DISCARD.x, 1.7, DISCARD.z]} center zIndexRange={[15, 0]}>
         {game.pendingDraw > 0 && !props.picking && (
-          <div className="pending3d" style={{ fontSize: `${Math.min(6, 2.2 + game.pendingDraw * 0.06)}rem` }}>
-            +{game.pendingDraw}
-          </div>
+          <PendingCount n={game.pendingDraw} width={size.width} />
         )}
       </Html>
 
@@ -152,6 +151,18 @@ export function Scene(props: Props) {
         </EffectComposer>
       ) : null}
     </>
+  );
+}
+
+/** 桌子中間累積的 +N：越多字越大，但不能比畫面還寬（手機直的放不下「+567.1億」這種） */
+function PendingCount({ n, width }: { n: number; width: number }) {
+  const text = `+${formatCount(n)}`;
+  // 粗斜體的字，寬度大約是字高的 0.7 倍
+  const fit = (width * 0.85) / (text.length * 0.7);
+  return (
+    <div className="pending3d" style={{ fontSize: `min(${Math.min(6, 2.2 + n * 0.06)}rem, ${Math.floor(fit)}px)` }}>
+      {text}
+    </div>
   );
 }
 
@@ -387,7 +398,7 @@ function Deck({
         />
       </mesh>
       <Html portal={labels} position={[CARD_W * 0.42, -CARD_H * 0.42, 0]} center zIndexRange={[12, 0]}>
-        <div className={`deck-badge ${pending > 0 ? 'hot' : ''}`}>{pending > 0 ? `+${pending}` : count}</div>
+        <div className={`deck-badge ${pending > 0 ? 'hot' : ''}`}>{pending > 0 ? `+${formatCount(pending)}` : count}</div>
       </Html>
     </group>
   );

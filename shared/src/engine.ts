@@ -126,16 +126,25 @@ export function canPlay(state: GameState, card: Card): boolean {
   return card.kind !== 'number' || card.value === top.value;
 }
 
+/**
+ * 「不限手牌」其實還是有個上限：×2 一直疊可以疊到幾百億張，真的一張一張抽的話伺服器會先被撐爆。
+ * 手機畫面上幾百張牌也已經點不到了。
+ */
+export const MAX_HAND = 500;
+
 /** 讓某位玩家抽 n 張，超過手牌上限就爆掉。回傳實際抽了幾張。 */
 function drawCards(state: GameState, index: number, n: number, rng: Rng): number {
   const player = state.players[index];
+  const limit = state.settings.handLimit || MAX_HAND;
   let drawn = 0;
   for (; drawn < n; drawn++) {
     player.hand.push(takeCard(state, rng));
-    const limit = state.settings.handLimit;
-    if (limit > 0 && player.hand.length > limit) {
+    if (player.hand.length > limit) {
       drawn++;
-      eliminate(state, index, `💥 ${player.name} 手牌超過 ${limit} 張，爆牌出局！`);
+      const msg = state.settings.handLimit
+        ? `💥 ${player.name} 手牌超過 ${limit} 張，爆牌出局！`
+        : `💥 ${player.name} 被 ${n} 張牌活埋了，爆牌出局！`;
+      eliminate(state, index, msg);
       break;
     }
   }

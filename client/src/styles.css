@@ -11,6 +11,14 @@
   --muted: #b7c4bc;
   --panel: rgba(8, 10, 18, 0.78);
   --bounce: cubic-bezier(0.3, 1.6, 0.5, 1);
+  /*
+   * 手機版 Discord 會把自己的按鈕蓋在畫面上（直的在上面、橫的在旁邊），
+   * 它用 --discord-safe-area-inset-* 告訴我們被蓋掉多少；瀏覽器直接開的話用系統的瀏海/圓角範圍
+   */
+  --sait: var(--discord-safe-area-inset-top, env(safe-area-inset-top, 0px));
+  --saib: var(--discord-safe-area-inset-bottom, env(safe-area-inset-bottom, 0px));
+  --sail: var(--discord-safe-area-inset-left, env(safe-area-inset-left, 0px));
+  --sair: var(--discord-safe-area-inset-right, env(safe-area-inset-right, 0px));
   color-scheme: dark;
 }
 
@@ -32,6 +40,13 @@ body {
   overflow: hidden;
   user-select: none;
   -webkit-tap-highlight-color: transparent;
+  /* 整個畫面（包括 3D 畫布）縮在沒被蓋住的範圍裡 */
+  padding: var(--sait) var(--sair) var(--saib) var(--sail);
+}
+
+/* 遊戲中被蓋住的那條跟牌桌一樣黑 */
+body:has(.table3d) {
+  background: #05060b;
 }
 
 button {
@@ -137,7 +152,7 @@ svg {
 /* 斷線提示 */
 .banner {
   position: fixed;
-  top: 12px;
+  top: calc(12px + var(--sait));
   left: 50%;
   transform: translateX(-50%);
   display: flex;
@@ -196,7 +211,7 @@ svg {
   display: grid;
   place-items: center;
   z-index: 40;
-  padding: 16px;
+  padding: calc(16px + var(--sait)) calc(16px + var(--sair)) calc(16px + var(--saib)) calc(16px + var(--sail));
   animation: fade-in 0.4s ease-out;
 }
 
@@ -758,7 +773,7 @@ svg {
   z-index: 70;
   display: grid;
   place-items: center;
-  padding: 16px;
+  padding: calc(16px + var(--sait)) calc(16px + var(--sair)) calc(16px + var(--saib)) calc(16px + var(--sail));
   background: rgba(0, 0, 0, 0.65);
   animation: fade-in 0.25s ease-out;
 }
