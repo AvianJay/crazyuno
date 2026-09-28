@@ -42,9 +42,9 @@ export function Lobby({ view, send }: { view: RoomView; send: Send }) {
     <div className="lobby-screen">
       <FloatingCards />
       <div className="lobby">
-        <h1 className="title">
-          <span className="title-crazy">瘋狂</span>
-          <span className="title-uno">UNO</span>
+        <h1 className="title" aria-label="MadCards">
+          <span className="brand-mark" aria-hidden="true" />
+          <span className="brand-text">MadCards</span>
         </h1>
 
         <section className="panel" style={{ '--i': 0 } as CSSProperties}>

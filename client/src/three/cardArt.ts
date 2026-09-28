@@ -90,7 +90,7 @@ export function feltTexture(): THREE.Texture {
   g.save();
   g.translate(S / 2, S / 2 + 250);
   g.globalAlpha = 0.1;
-  label(g, '瘋狂 UNO', 0, 0, 90, 460, '#ffffff', 'transparent');
+  label(g, 'MadCards', 0, 0, 90, 460, '#ffffff', 'transparent');
   g.restore();
   const t = toTexture(c);
   t.anisotropy = 4;

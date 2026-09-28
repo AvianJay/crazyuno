@@ -33,6 +33,66 @@ function rounded(g: CanvasRenderingContext2D, x: number, y: number, w: number, h
   g.roundRect(x, y, w, h, r);
 }
 
+/** 牌面中間的招牌造型：以 (0, 0) 為中心、半寬 hw、半高 hh 的圓角菱形 */
+const DW = 104;
+const DH = 140;
+
+function diamond(g: CanvasRenderingContext2D, hw: number, hh: number, r: number) {
+  const pts = [
+    [0, -hh],
+    [hw, 0],
+    [0, hh],
+    [-hw, 0],
+  ];
+  g.beginPath();
+  g.moveTo(hw / 2, -hh / 2);
+  for (let i = 1; i <= 4; i++) {
+    const [px, py] = pts[i % 4];
+    const [nx, ny] = pts[(i + 1) % 4];
+    g.arcTo(px, py, (px + nx) / 2, (py + ny) / 2, r);
+  }
+  g.closePath();
+}
+
+/**
+ * 萬用牌的四色菱形：沿著跟邊平行的兩條線切成上右下左四塊小菱形，
+ * 排法跟選顏色的四個菱形一樣（上紅、右黃、下藍、左綠）。
+ */
+function fourColorDiamond(g: CanvasRenderingContext2D, hw: number, hh: number, r: number) {
+  const x = hw / 2;
+  const y = hh / 2;
+  const parts: [string, number[][]][] = [
+    [COLOR_HEX.red, [[0, -hh], [x, -y], [0, 0], [-x, -y]]],
+    [COLOR_HEX.yellow, [[hw, 0], [x, y], [0, 0], [x, -y]]],
+    [COLOR_HEX.blue, [[0, hh], [-x, y], [0, 0], [x, y]]],
+    [COLOR_HEX.green, [[-hw, 0], [-x, -y], [0, 0], [-x, y]]],
+  ];
+  g.save();
+  diamond(g, hw, hh, r);
+  g.clip();
+  for (const [color, poly] of parts) {
+    g.beginPath();
+    poly.forEach(([px, py], i) => (i === 0 ? g.moveTo(px, py) : g.lineTo(px, py)));
+    g.closePath();
+    g.fillStyle = color;
+    g.fill();
+  }
+  // 四塊之間的白線
+  g.strokeStyle = '#fbfaf5';
+  g.lineWidth = 4;
+  g.beginPath();
+  g.moveTo(-x, -y);
+  g.lineTo(x, y);
+  g.moveTo(x, -y);
+  g.lineTo(-x, y);
+  g.stroke();
+  g.restore();
+  diamond(g, hw, hh, r);
+  g.strokeStyle = '#fbfaf5';
+  g.lineWidth = 5;
+  g.stroke();
+}
+
 /** 在 (x, y) 畫一段置中的字，寬度超過 maxW 就縮小 */
 export function label(
   g: CanvasRenderingContext2D,
@@ -311,39 +371,39 @@ export function faceCanvas(card: Pick<Card, 'kind' | 'color' | 'value'>): HTMLCa
     g.restore();
   }
 
-  // 中間斜斜的橢圓
+  // 中間的圓角菱形：有色牌是白的，萬用牌四色，+99 是金色外框
   g.save();
   g.translate(W / 2, H / 2);
-  g.rotate(-0.42);
-  g.beginPath();
-  g.ellipse(0, 0, 86, 150, 0, 0, Math.PI * 2);
   if (legendary) {
+    diamond(g, DW, DH, 18);
+    g.shadowColor = '#ff2020';
+    g.shadowBlur = 18;
     g.strokeStyle = '#ffd34d';
     g.lineWidth = 6;
     g.stroke();
+    g.shadowBlur = 0;
+    diamond(g, DW - 16, DH - 22, 12);
+    g.strokeStyle = 'rgba(255, 211, 77, 0.45)';
+    g.lineWidth = 2;
+    g.stroke();
   } else if (card.color) {
+    diamond(g, DW, DH, 18);
+    g.shadowColor = 'rgba(0, 0, 0, 0.35)';
+    g.shadowBlur = 12;
+    g.shadowOffsetY = 4;
     g.fillStyle = '#fbfaf5';
     g.fill();
   } else {
-    // 萬用牌：橢圓裡是四色
-    g.clip();
-    const colors = [COLOR_HEX.red, COLOR_HEX.blue, COLOR_HEX.yellow, COLOR_HEX.green];
-    colors.forEach((col, i) => {
-      g.beginPath();
-      g.moveTo(0, 0);
-      g.arc(0, 0, 200, (i * Math.PI) / 2, ((i + 1) * Math.PI) / 2);
-      g.fillStyle = col;
-      g.fill();
-    });
+    fourColorDiamond(g, DW, DH, 18);
   }
   g.restore();
 
-  // 中間的大圖示或大字
+  // 中間的大圖示或大字（要塞得進菱形裡）
   const main = card.color ? COLOR_HEX[card.color] : '#ffffff';
   if (icon) {
     g.save();
     g.translate(W / 2, H / 2);
-    icon(g, 200, main);
+    icon(g, 165, main);
     g.restore();
   } else {
     let fill: string | CanvasGradient = main;
@@ -356,13 +416,13 @@ export function faceCanvas(card: Pick<Card, 'kind' | 'color' | 'value'>): HTMLCa
       g.shadowColor = '#ff2020';
       g.shadowBlur = 30;
     }
-    const size = text.length <= 1 ? 150 : text.length === 2 ? 120 : 100;
-    label(g, text, W / 2, H / 2 + 6, size, 190, fill);
+    const size = text.length <= 1 ? 136 : text.length === 2 ? 96 : 84;
+    label(g, text, W / 2, H / 2 + 4, size, legendary ? 170 : 140, fill);
     g.shadowBlur = 0;
     // 6 和 9 加底線才分得出來
     if (card.kind === 'number' && (card.value === 6 || card.value === 9)) {
       g.fillStyle = '#000';
-      g.fillRect(W / 2 - 34, H / 2 + 72, 68, 10);
+      g.fillRect(W / 2 - 28, H / 2 + 58, 56, 9);
     }
   }
 
@@ -395,31 +455,82 @@ export function backCanvas(): HTMLCanvasElement {
   rounded(g, 0, 0, W, H, R);
   g.fillStyle = '#fbfaf5';
   g.fill();
+
+  // 深紫底 + 菱形格紋
   rounded(g, 14, 14, W - 28, H - 28, R - 10);
-  const bg = g.createRadialGradient(W / 2, H / 2, 20, W / 2, H / 2, H * 0.6);
-  bg.addColorStop(0, '#2a1036');
-  bg.addColorStop(1, '#0b0610');
+  const bg = g.createRadialGradient(W / 2, H / 2, 20, W / 2, H / 2, H * 0.62);
+  bg.addColorStop(0, '#2b1450');
+  bg.addColorStop(1, '#0a0716');
   g.fillStyle = bg;
   g.fill();
+  g.save();
+  g.clip();
+  g.strokeStyle = 'rgba(123, 92, 255, 0.16)';
+  g.lineWidth = 2;
+  for (let x = -H; x < W + H; x += 24) {
+    g.beginPath();
+    g.moveTo(x, 0);
+    g.lineTo(x + H * 0.75, H);
+    g.moveTo(x, H);
+    g.lineTo(x + H * 0.75, 0);
+    g.stroke();
+  }
+  g.restore();
 
+  // 四個角落的小菱形：遊戲的四種顏色
+  const corners: [string, number, number][] = [
+    [COLOR_HEX.red, 40, 46],
+    [COLOR_HEX.yellow, W - 40, 46],
+    [COLOR_HEX.green, 40, H - 46],
+    [COLOR_HEX.blue, W - 40, H - 46],
+  ];
+  for (const [color, x, y] of corners) {
+    g.save();
+    g.translate(x, y);
+    diamond(g, 11, 15, 3);
+    g.fillStyle = color;
+    g.fill();
+    g.restore();
+  }
+
+  // 中間的霓虹菱形
   g.save();
   g.translate(W / 2, H / 2);
-  g.rotate(-0.42);
-  g.beginPath();
-  g.ellipse(0, 0, 86, 150, 0, 0, Math.PI * 2);
-  g.fillStyle = COLOR_HEX.red;
+  diamond(g, DW, DH, 20);
+  g.fillStyle = 'rgba(12, 6, 26, 0.85)';
   g.fill();
-  g.lineWidth = 6;
-  g.strokeStyle = '#ffd34d';
+  const neon = g.createLinearGradient(-DW, -DH, DW, DH);
+  neon.addColorStop(0, '#ff4fd8');
+  neon.addColorStop(0.5, '#7b5cff');
+  neon.addColorStop(1, '#3ee0ff');
+  g.shadowColor = '#ff4fd8';
+  g.shadowBlur = 20;
+  g.strokeStyle = neon;
+  g.lineWidth = 8;
   g.stroke();
-  g.restore();
+  g.shadowBlur = 0;
 
-  g.save();
-  g.translate(W / 2, H / 2);
-  g.rotate(-0.42);
-  label(g, 'UNO', 0, 0, 84, 170, COLOR_HEX.yellow);
+  // 字：直的、不斜，跟品牌 logo 一樣
+  const word = (text: string, y: number, size: number, maxW: number, fill: string | CanvasGradient, glow: string) => {
+    g.save();
+    g.translate(0, y);
+    g.font = `900 ${size}px ${FONT}`;
+    const w = g.measureText(text).width;
+    if (w > maxW) g.scale(maxW / w, maxW / w);
+    g.textAlign = 'center';
+    g.textBaseline = 'middle';
+    g.shadowColor = glow;
+    g.shadowBlur = 14;
+    g.fillStyle = fill;
+    g.fillText(text, 0, 0);
+    g.restore();
+  };
+  const mad = g.createLinearGradient(-70, 0, 70, 0);
+  mad.addColorStop(0, '#ff8ae6');
+  mad.addColorStop(1, '#ffffff');
+  word('MAD', -16, 70, 150, mad, '#ff4fd8');
+  word('CARDS', 38, 34, 118, '#8ff0ff', '#3ee0ff');
   g.restore();
-  label(g, '瘋狂', W / 2, 62, 34, 120, '#ff4fd8', '#000');
 
   backCache = c;
   return c;

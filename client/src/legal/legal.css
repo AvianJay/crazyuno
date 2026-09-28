@@ -36,6 +36,11 @@ body {
   -webkit-text-size-adjust: 100%;
 }
 
+/* 英文版用西文字型優先，不然彎引號（don’t）會被中文字型畫成全形、多出一大格 */
+[lang='en'] {
+  font-family: system-ui, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+}
+
 a {
   color: var(--cyan);
   text-underline-offset: 3px;
@@ -98,23 +103,28 @@ code {
   color: inherit;
 }
 
-.logo-crazy {
-  color: var(--pink);
-  text-shadow:
-    0 0 8px var(--pink),
-    0 0 18px var(--pink);
+/* 品牌：四色菱形 + 霓虹漸層的 MadCards（跟遊戲大廳一樣） */
+.brand-mark {
+  width: 0.7em;
+  height: 0.7em;
+  flex-shrink: 0;
+  border-radius: 18%;
+  border: 2px solid #fff;
+  background: conic-gradient(var(--yellow) 0 25%, var(--blue) 0 50%, var(--green) 0 75%, var(--red) 0);
+  rotate: 45deg;
+  margin-right: 4px;
+  box-shadow: 0 0 12px rgba(255, 79, 216, 0.6);
+  animation: brand-mark 3.2s var(--bounce) infinite;
 }
 
-.logo-uno {
-  background: var(--red);
-  color: var(--yellow);
-  padding: 0 10px;
-  border-radius: 10px;
-  border: 3px solid #fff;
-  font-style: italic;
-  text-shadow: 2px 2px 0 #000;
-  rotate: -4deg;
-  animation: wobble 2.6s ease-in-out infinite;
+.brand-text {
+  background: linear-gradient(90deg, var(--pink), #7b5cff, var(--cyan), #7b5cff, var(--pink));
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  filter: drop-shadow(0 0 8px rgba(123, 92, 255, 0.7));
+  animation: brand-shift 4s linear infinite;
 }
 
 .switches {
@@ -276,13 +286,6 @@ section.block li {
   font-size: 0.9rem;
 }
 
-.trademark {
-  border-left: 4px solid var(--yellow);
-  padding: 6px 12px;
-  background: rgba(244, 180, 0, 0.08);
-  border-radius: 0 10px 10px 0;
-}
-
 /* 還沒在 .env 設定聯絡方式時的提醒 */
 .contact-missing {
   color: #ff8a8a;
@@ -339,10 +342,25 @@ html.embed .top {
   }
 }
 
-@keyframes wobble {
-  50% {
-    rotate: 3deg;
-    scale: 1.05;
+@keyframes brand-mark {
+  0%,
+  65% {
+    rotate: 45deg;
+    scale: 1;
+  }
+  85% {
+    rotate: 405deg;
+    scale: 1.15;
+  }
+  100% {
+    rotate: 405deg;
+    scale: 1;
+  }
+}
+
+@keyframes brand-shift {
+  to {
+    background-position: -200% 0;
   }
 }
 

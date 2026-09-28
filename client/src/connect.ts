@@ -71,6 +71,7 @@ function getLocalIdentity(): Identity {
 }
 
 export async function joinRoom(identity: Identity): Promise<Room> {
-  const client = new Client(`${location.origin}${base}/colyseus`);
+  // 開發模式由 Vite 把 /colyseus 轉給遊戲伺服器；正式版網頁和遊戲伺服器在同一個 port，直接連
+  const client = new Client(`${location.origin}${base}${import.meta.env.DEV ? '/colyseus' : ''}`);
   return client.joinOrCreate('uno', identity);
 }

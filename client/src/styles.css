@@ -377,33 +377,38 @@ svg {
   display: flex;
   justify-content: center;
   align-items: center;
-  gap: 10px;
-  font-size: 2.8rem;
+  gap: 14px;
+  font-size: 2.9rem;
   margin: 6px 0;
   animation: drop-in 0.7s var(--bounce);
 }
 
-.title-crazy {
-  color: var(--pink);
-  font-weight: 900;
-  text-shadow:
-    0 0 10px var(--pink),
-    0 0 24px var(--pink);
-  animation: neon 3s infinite;
+/* 品牌：四色菱形 + 霓虹漸層的 MadCards（跟牌面、牌背同一套造型） */
+.brand-mark {
+  width: 0.7em;
+  height: 0.7em;
+  flex-shrink: 0;
+  border-radius: 18%;
+  border: 3px solid #fff;
+  /* 轉 45 度之後：上紅、右黃、下藍、左綠，跟萬用牌一樣 */
+  background: conic-gradient(var(--yellow) 0 25%, var(--blue) 0 50%, var(--green) 0 75%, var(--red) 0);
+  rotate: 45deg;
+  box-shadow:
+    0 0 18px rgba(255, 79, 216, 0.6),
+    0 0 36px rgba(62, 224, 255, 0.3);
+  animation: brand-mark 3.2s var(--bounce) infinite;
 }
 
-.title-uno {
-  display: inline-block;
-  background: var(--red);
-  color: var(--yellow);
-  padding: 0 14px;
-  border-radius: 14px;
-  border: 4px solid white;
-  font-style: italic;
+.brand-text {
   font-weight: 900;
-  text-shadow: 3px 3px 0 #000;
-  box-shadow: 0 0 30px rgba(229, 56, 59, 0.6);
-  animation: wobble 2.6s ease-in-out infinite;
+  letter-spacing: 0.01em;
+  background: linear-gradient(90deg, var(--pink), #7b5cff, var(--cyan), #7b5cff, var(--pink));
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  filter: drop-shadow(0 0 10px rgba(123, 92, 255, 0.7)) drop-shadow(0 3px 0 rgba(0, 0, 0, 0.5));
+  animation: brand-shift 4s linear infinite;
 }
 
 .panel {
@@ -1553,28 +1558,25 @@ svg {
   }
 }
 
-@keyframes wobble {
+@keyframes brand-mark {
   0%,
-  100% {
-    rotate: -4deg;
+  65% {
+    rotate: 45deg;
+    scale: 1;
   }
-  50% {
-    rotate: 3deg;
-    scale: 1.04;
+  85% {
+    rotate: 405deg;
+    scale: 1.15;
+  }
+  100% {
+    rotate: 405deg;
+    scale: 1;
   }
 }
 
-@keyframes neon {
-  0%,
-  18%,
-  22%,
-  60%,
-  100% {
-    opacity: 1;
-  }
-  20%,
-  61% {
-    opacity: 0.4;
+@keyframes brand-shift {
+  to {
+    background-position: -200% 0;
   }
 }
 

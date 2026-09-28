@@ -1,5 +1,6 @@
+import { existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import express from 'express';
+import express, { type Application } from 'express';
 import { defineRoom, defineServer } from 'colyseus';
 import { UnoRoom } from './UnoRoom';
 
@@ -9,8 +10,13 @@ try {
   // 沒有 .env 也能跑（只是不能在 Discord 裡登入）
 }
 
-// 不用 Colyseus 預設的 2567：Windows 常把那一段保留給 Hyper-V，會 EACCES
-const port = Number(process.env.PORT) || 4567;
+/** npm start（scripts/start.mjs）會設成 production：網頁也由這台提供 */
+const production = process.env.NODE_ENV === 'production';
+
+// 不用 Colyseus 預設的 2567：Windows 常把那一段保留給 Hyper-V，會 EACCES。
+// 正式版看 PORT，沒有的話看 SERVER_PORT（Pterodactyl 之類的面板會自動給）。
+// 開發模式固定 4567：Vite 會把 /api、/colyseus 轉到這裡，改了就連不上。
+const port = production ? Number(process.env.PORT || process.env.SERVER_PORT) || 4567 : 4567;
 
 const server = defineServer({
   rooms: {
@@ -45,7 +51,28 @@ const server = defineServer({
       }
       res.json({ access_token: data.access_token });
     });
+
+    // 正式版：打包好的網頁也從這裡出去，整個遊戲只要一個 port
+    if (production) serveClient(app);
   },
 });
 
-server.listen(port);
+server.listen(port).then(() => {
+  if (production) console.log(`\n🃏 正式版已啟動：http://localhost:${port}\n`);
+});
+
+/**
+ * 提供 client/dist（npm run build 的結果）。
+ * Colyseus 自己的路徑（/matchmake/…、WebSocket）會先被 Colyseus 接走，其他的才輪到這裡。
+ */
+function serveClient(app: Application) {
+  const dist = fileURLToPath(new URL('../../client/dist/', import.meta.url));
+  if (!existsSync(`${dist}index.html`)) {
+    console.error('找不到 client/dist/index.html：先跑 npm run build（npm start 會自動打包）');
+    return;
+  }
+  // 檔名有雜湊的可以放心快取一年；HTML 不快取，更新後大家才會拿到新版
+  app.use('/assets', express.static(`${dist}assets`, { immutable: true, maxAge: '1y', fallthrough: false }));
+  // /privacy 會自動轉到 /privacy/（資料夾），/privacy/ 給 privacy/index.html
+  app.use(express.static(dist, { maxAge: 0 }));
+}

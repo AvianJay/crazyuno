@@ -113,7 +113,7 @@ export function direct(events: GameEvent[], view: RoomView, game: GameView, seat
 
       case 'uno':
         sfx.unoShout();
-        emitFx({ kind: 'text', text: 'UNO!', tone: 'uno' });
+        emitFx({ kind: 'text', text: 'LAST!', tone: 'uno' });
         emitFx({ kind: 'burst', at: v(seat(e.id), 1.2), colors: ['#ffc400', '#ff3b3f', '#ffffff'], count: 160, speed: 4, up: 2 });
         break;
 

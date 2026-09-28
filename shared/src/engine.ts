@@ -253,10 +253,10 @@ export function passTurn(state: GameState, playerId: string): void {
 export function sayUno(state: GameState, playerId: string): void {
   const player = state.players.find((p) => p.id === playerId);
   if (!player || player.out || state.phase !== 'playing') throw new GameError('現在不能喊');
-  if (player.hand.length > 2) throw new GameError('剩兩張以下才能喊 UNO');
+  if (player.hand.length > 2) throw new GameError('剩兩張以下才能喊 LAST!');
   if (player.unoSafe) return;
   player.unoSafe = true;
-  pushLog(state, `📢 ${player.name}：UNO！`);
+  pushLog(state, `📢 ${player.name}：LAST!`);
 }
 
 export function catchUno(state: GameState, catcherId: string, targetId: string, rng: Rng = Math.random): void {
@@ -266,7 +266,7 @@ export function catchUno(state: GameState, catcherId: string, targetId: string, 
   const target = state.players[targetIndex];
   if (!catcher || catcher.out || !target || catcherId === targetId) throw new GameError('抓不到');
   if (target.out || target.hand.length !== 1 || target.unoSafe) throw new GameError('他已經喊過了，或根本不是剩一張');
-  pushLog(state, `🚨 ${catcher.name} 抓到 ${target.name} 沒喊 UNO！罰抽 2 張`);
+  pushLog(state, `🚨 ${catcher.name} 抓到 ${target.name} 沒喊 LAST，罰抽 2 張`);
   drawCards(state, targetIndex, 2, rng);
 }
 

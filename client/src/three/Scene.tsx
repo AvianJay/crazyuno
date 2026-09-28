@@ -713,9 +713,9 @@ function Seat({
               </>
             )}
           </div>
-          {player.unoSafe && !player.out && <div className="uno-badge">UNO!</div>}
+          {player.unoSafe && !player.out && <div className="uno-badge">LAST!</div>}
           {canCatch && (
-            <button className="catch-btn" onClick={onCatch} aria-label="抓他沒喊 UNO">
+            <button className="catch-btn" onClick={onCatch} aria-label="抓他沒喊 LAST!">
               <SirenIcon />
             </button>
           )}

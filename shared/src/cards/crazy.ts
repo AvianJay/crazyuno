@@ -80,7 +80,7 @@ export const crazyCards: CardDef[] = [
     kind: 'swapAll',
     name: '大風吹',
     label: '🌀',
-    description: '所有人把手牌整手傳給下一個人。傳完大家的 UNO 都要重喊。',
+    description: '所有人把手牌整手傳給下一個人，傳完大家都要重喊 LAST!',
     crazy: true,
     wild: true,
     count: 2,

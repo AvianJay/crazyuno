@@ -255,7 +255,7 @@ export function Table({ view, game, send }: { view: RoomView; game: GameView; se
                   <DeckIcon />+{f.n}
                 </span>
               )}
-              {f.kind === 'uno' && <span className="feed-uno">UNO!</span>}
+              {f.kind === 'uno' && <span className="feed-uno">LAST!</span>}
               {f.kind === 'out' && <SkullIcon className="feed-icon danger" />}
               {f.kind === 'caught' && <SirenIcon className="feed-icon danger" />}
               {f.kind === 'timeout' && <TimerIcon className="feed-icon" />}
@@ -275,7 +275,7 @@ export function Table({ view, game, send }: { view: RoomView; game: GameView; se
               </button>
             )}
             <button className={`uno-btn ${hand.length <= 2 && !me.unoSafe ? 'ready' : ''}`} onClick={() => send('uno')}>
-              UNO!
+              LAST!
             </button>
           </div>
         )}
