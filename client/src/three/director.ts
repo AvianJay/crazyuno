@@ -78,10 +78,28 @@ export function direct(
         break;
 
       case 'swap':
-        sfx.tornado();
-        emitFx({ kind: 'spin' }, 200);
-        emitFx({ kind: 'text', text: '🌀 大風吹！', tone: 'gold' }, 200);
-        emitFx({ kind: 'burst', at: [0, 0.3, 0.3], colors: ['#bdf6ff', '#ffffff', '#7b5cff'], count: 300, speed: 7, up: 2, life: 1.8 }, 300);
+        if (e.card.kind === 'swapAll') {
+          sfx.tornado();
+          emitFx({ kind: 'spin' }, 200);
+          emitFx({ kind: 'text', text: '🌀 大風吹！', tone: 'gold' }, 200);
+          emitFx({ kind: 'burst', at: [0, 0.3, 0.3], colors: ['#bdf6ff', '#ffffff', '#7b5cff'], count: 300, speed: 7, up: 2, life: 1.8 }, 300);
+        } else if (e.card.kind === 'number' && e.card.value === 7) {
+          // 0/7 規則的 7：兩個人對調
+          const [a, b] = e.moves[0];
+          sfx.whoosh(0.5, 0.2);
+          sfx.shimmer();
+          emitFx({ kind: 'text', text: `🔀 ${name(a)} ⇄ ${name(b)}`, color: '#3ee0ff' }, 250);
+          for (const id of [a, b]) {
+            emitFx({ kind: 'ring', at: v(seat(id), 0.05), color: '#3ee0ff', size: 3, life: 1 }, 300);
+            emitFx({ kind: 'burst', at: v(seat(id), 1), colors: ['#3ee0ff', '#ffffff', '#ff4fd8'], count: 140, speed: 4, up: 2 }, 300);
+          }
+        } else {
+          // 0/7 規則的 0：大家往下一家傳
+          sfx.tornado();
+          emitFx({ kind: 'text', text: game.direction === 1 ? '🔄 手牌往下傳！' : '🔄 手牌往回傳！', color: colorHex }, 250);
+          emitFx({ kind: 'ring', at: pile, color: colorHex, size: 7, life: 1.2 }, 300);
+          emitFx({ kind: 'burst', at: [0, 0.3, 0.3], colors: [colorHex, '#ffffff'], count: 220, speed: 6, up: 2, life: 1.5 }, 300);
+        }
         break;
 
       case 'mirror':
@@ -135,6 +153,14 @@ export function direct(
         emitFx({ kind: 'text', text: '⏰ 時間到' });
         break;
 
+      case 'timeUp':
+        sfx.alarm();
+        sfx.buzzer();
+        emitFx({ kind: 'flash', color: '#ffffff', strength: 0.5 });
+        emitFx({ kind: 'text', text: '⌛ 整局時間到！', tone: 'danger' });
+        emitFx({ kind: 'shake', amount: 0.5 });
+        break;
+
       case 'yourTurn':
         sfx.chime();
         break;
@@ -164,7 +190,7 @@ export function direct(
         if (e.winnerId) {
           emitFx({ kind: 'burst', at: v(seat(e.winnerId), 1), colors: RAINBOW, count: 400, speed: 6, up: 4, life: 2 }, 200);
         }
-        emitFx({ kind: 'text', text: won ? '🎉 你贏了！' : `🏆 ${e.winnerId ? name(e.winnerId) : '沒有人'} 贏了`, tone: 'gold' }, 200);
+        emitFx({ kind: 'text', text: won ? '🎉 你贏了！' : e.winnerId ? `🏆 ${name(e.winnerId)} 贏了` : '🤝 平手！', tone: 'gold' }, 200);
         break;
       }
     }

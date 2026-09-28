@@ -6,7 +6,7 @@ import { ToneMappingMode, type ChromaticAberrationEffect } from 'postprocessing'
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactElement, type RefObject } from 'react';
 import * as THREE from 'three';
 import { Avatar } from '../components/Avatar';
-import { DeckIcon, RobotIcon, SirenIcon, SkullIcon } from '../components/icons';
+import { DeckIcon, RobotIcon, SirenIcon, SkullIcon, SwapIcon } from '../components/icons';
 import { formatCount } from '../count';
 import { backTexture, CARD_H, CARD_W, COLOR_HEX, feltTexture, glowTexture } from './cardArt';
 import { CardMesh, FACE_DOWN, FACE_UP, pose, type Pose } from './CardMesh';
@@ -34,11 +34,14 @@ interface Props {
   events: GameEvent[];
   /** 每開新的一局就換一個數字，讓牌堆全部重來 */
   round: number;
-  /** 出了萬用牌、還沒選顏色：這張牌先飛到桌子中間 */
-  pendingWild: Card | null;
+  /** 出了萬用牌還沒選顏色、出了 7 還沒選人：這張牌先飛到桌子中間 */
+  pendingCard: Card | null;
   /** 要不要顯示選顏色的四個菱形 */
   picking: boolean;
   onPickColor(color: Color): void;
+  /** 0/7 規則出 7：對手的座位變成可以點的按鈕 */
+  targeting: boolean;
+  onPickTarget(id: string): void;
   onPlay(card: Card): void;
   onDraw(): void;
   onCatch(targetId: string): void;
@@ -89,7 +92,7 @@ export function Scene(props: Props) {
         labels={labels}
         count={game.drawPileCount}
         pending={myTurn ? game.pendingDraw : 0}
-        active={myTurn && !game.hasDrawn && !props.pendingWild}
+        active={myTurn && !game.hasDrawn && !props.pendingCard}
         hint={myTurn && game.playable.length === 0}
         onDraw={props.onDraw}
       />
@@ -112,6 +115,8 @@ export function Scene(props: Props) {
               color={COLOR_HEX[game.currentColor]}
               canCatch={canCatch}
               onCatch={() => props.onCatch(p.id)}
+              canTarget={props.targeting && !p.out}
+              onTarget={() => props.onPickTarget(p.id)}
             />
           );
         })}
@@ -417,7 +422,7 @@ function Cards({
   events,
   seats,
   myTurn,
-  pendingWild,
+  pendingCard: pending,
   onPlay,
 }: Props & { seats: Map<string, THREE.Vector3>; myTurn: boolean }) {
   const size = useThree((s) => s.size);
@@ -446,9 +451,9 @@ function Cards({
         discard.current.push({ card: e.card, rz: jitter() });
         if (discard.current.length > 16) discard.current.shift();
       }
-      if (e.t === 'swap') giver = previousActive(game, view.you);
+      if (e.t === 'swap') giver = e.moves.find(([, to]) => to === view.you)?.[0] ?? null;
     }
-    // 新拿到的牌：一般從抽牌堆飛過來，大風吹從上家飛過來
+    // 新拿到的牌：一般從抽牌堆飛過來，換手牌的話從原本拿著的人那裡飛過來
     const fresh = hand.filter((c) => !known.current.has(c.id));
     const gap = fresh.length > 20 ? 0.025 : 0.08;
     fresh.forEach((c, i) => {
@@ -459,8 +464,8 @@ function Cards({
     for (const c of hand) known.current.add(c.id);
   }, [events]);
 
-  // 飛到中間等選顏色的那張不算在手牌的位置裡
-  const pendingId = pendingWild && hand.some((c) => c.id === pendingWild.id) ? pendingWild.id : null;
+  // 飛到中間等選顏色（或選人）的那張不算在手牌的位置裡
+  const pendingId = pending && hand.some((c) => c.id === pending.id) ? pending.id : null;
   const inHand = pendingId ? hand.filter((c) => c.id !== pendingId) : hand;
   const slots = useMemo(() => handSlots(inHand.length, aspect, 78, size.height), [inHand.length, aspect, size.height]);
   const handIds = new Set(hand.map((c) => c.id));
@@ -515,7 +520,7 @@ function Cards({
     );
   });
 
-  // 萬用牌先丟到桌子中間浮著，半躺半朝鏡頭，等選完顏色
+  // 萬用牌（或換牌的 7）先丟到桌子中間浮著，半躺半朝鏡頭，等選完顏色（或人）
   const pendingCard = pendingId ? hand.find((c) => c.id === pendingId)! : null;
   if (pendingCard) {
     const topY = 0.012 + discard.current.length * 0.006;
@@ -554,19 +559,7 @@ function seatPoint(seats: Map<string, THREE.Vector3>, id: string, y: number) {
   return (seats.get(id) ?? MY_SEAT).clone().setY(y);
 }
 
-/** 大風吹時把牌傳給我的人：往出牌方向的反方向找第一個還沒出局的 */
-function previousActive(game: GameView, you: string): string | null {
-  const n = game.players.length;
-  const me = game.players.findIndex((p) => p.id === you);
-  if (me === -1) return null;
-  for (let k = 1; k < n; k++) {
-    const p = game.players[(((me - k * game.direction) % n) + n) % n];
-    if (!p.out) return p.id;
-  }
-  return null;
-}
-
-// ---------- 只有牌背、飛完就消失的牌（別人抽牌、大風吹、爆牌）----------
+// ---------- 只有牌背、飛完就消失的牌（別人抽牌、換手牌、爆牌）----------
 
 interface Ghost {
   id: number;
@@ -594,16 +587,14 @@ function Ghosts({ events, game, you, seats }: { events: GameEvent[]; game: GameV
           add.push({ id: ghostId++, from: deck, to: seatPose(e.id), delay: i * (e.n > 10 ? 0.04 : 0.1), speed: 7 });
         }
       } else if (e.t === 'swap') {
-        // 每個人的手牌往下一家飛
-        const active = game.players.filter((p) => !p.out);
-        active.forEach((p, i) => {
-          const to = active[(i + (game.direction === 1 ? 1 : active.length - 1)) % active.length];
-          const from = p.id === you ? pose(handCenter(), [0, 0, 0], 0.5) : seatPose(p.id);
-          const dest = to.id === you ? pose(handCenter(), [0, 0, 0], 0.5) : seatPose(to.id);
-          for (let k = 0; k < Math.min(p.handCount, 6); k++) {
-            add.push({ id: ghostId++, from, to: dest, delay: k * 0.06, speed: 4 });
+        // 每一手牌從原本的人飛到新主人那裡（張數 = 新主人現在的張數）
+        const at = (id: string) => (id === you ? pose(handCenter(), [0, 0, 0], 0.5) : seatPose(id));
+        for (const [from, to] of e.moves) {
+          const n = game.players.find((p) => p.id === to)?.handCount ?? 0;
+          for (let k = 0; k < Math.min(n, 6); k++) {
+            add.push({ id: ghostId++, from: at(from), to: at(to), delay: k * 0.06, speed: 4 });
           }
-        });
+        }
       } else if (e.t === 'out') {
         // 爆牌：牌往四面八方噴出去
         const at = seatPoint(seats, e.id, 1);
@@ -666,6 +657,8 @@ function Seat({
   color,
   canCatch,
   onCatch,
+  canTarget,
+  onTarget,
   labels,
   offline,
 }: {
@@ -678,6 +671,9 @@ function Seat({
   color: string;
   canCatch: boolean;
   onCatch(): void;
+  /** 可以選他換手牌 */
+  canTarget: boolean;
+  onTarget(): void;
 }) {
   const ring = useRef<THREE.MeshBasicMaterial>(null!);
   const fan = useRef<THREE.Group>(null!);
@@ -709,7 +705,9 @@ function Seat({
         })}
       </group>
       <Html portal={labels} position={[0, 1.9, -0.7]} center zIndexRange={[20, 0]}>
-        <div className={`seat3d ${active ? 'active' : ''} ${player.out ? 'out' : ''} ${offline && !player.out ? 'bot' : ''}`}>
+        <div
+          className={`seat3d ${active ? 'active' : ''} ${player.out ? 'out' : ''} ${offline && !player.out ? 'bot' : ''} ${canTarget ? 'targetable' : ''}`}
+        >
           <div className="seat-face">
             <Avatar name={player.name} src={player.avatar} />
             {offline && !player.out && <RobotIcon className="bot-badge" aria-label="機器人代打中" />}
@@ -725,9 +723,14 @@ function Seat({
             )}
           </div>
           {player.unoSafe && !player.out && <div className="uno-badge">LAST!</div>}
-          {canCatch && (
+          {canCatch && !canTarget && (
             <button className="catch-btn" onClick={onCatch} aria-label="抓他沒喊 LAST!">
               <SirenIcon />
+            </button>
+          )}
+          {canTarget && (
+            <button className="swap-btn" onClick={onTarget} aria-label={`跟 ${player.name} 換手牌`}>
+              <SwapIcon />
             </button>
           )}
         </div>

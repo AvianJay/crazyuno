@@ -2,9 +2,10 @@
  * 開幾個機器人連進房間互打一整局，用來測試伺服器。
  *   npx tsx scripts/bots.mts [人數] [房間]
  * 也可以自己開瀏覽器 http://localhost:5173/?room=bots 跟它們一起玩（機器人只會在輪到自己時出牌，不會開局，要你當房主或讓 bot0 開）
+ * 環境變數 SEVEN_ZERO=1 開 0/7 規則、GAME_MINUTES=1 整局限時一分鐘（bot0 當房主開局時才有用）
  */
 import { Client, type Room } from '@colyseus/sdk';
-import { getCardDef, type RoomView } from '@crazyuno/shared';
+import { getCardDef, isSwapSeven, type RoomView } from '@crazyuno/shared';
 
 const count = Number(process.argv[2] ?? 3);
 const roomKey = process.argv[3] ?? `bots-${Date.now()}`;
@@ -27,7 +28,11 @@ async function bot(i: number): Promise<void> {
     const g = v.game;
     if (!g) {
       if (i === 0 && v.you === v.hostId && v.seats.length >= count && !finished) {
-        room.send('settings', { turnSeconds: 0 });
+        room.send('settings', {
+          turnSeconds: 0,
+          sevenZero: process.env.SEVEN_ZERO === '1',
+          gameMinutes: Number(process.env.GAME_MINUTES ?? 0),
+        });
         room.send('start');
       }
       return;
@@ -48,7 +53,11 @@ async function bot(i: number): Promise<void> {
         room.send('catch', { targetId: p.id });
       }
     }
-    if (g.turnId !== v.you) return;
+    if (g.turnId !== v.you) {
+      // 換人了就重來：紀錄最多 30 行、換手牌又會讓張數回到一樣，只靠下面的 key 分不出是新的回合
+      lastSeq = '';
+      return;
+    }
     const key = `${g.log.length}:${hand.length}:${g.hasDrawn}:${g.pendingDraw}`;
     if (key === lastSeq) return;
     lastSeq = key;
@@ -74,7 +83,10 @@ async function bot(i: number): Promise<void> {
     const card = hand.find((c) => g.playable.includes(c.id));
     if (card) {
       const color = getCardDef(card.kind).wild ? COLORS[Math.floor(Math.random() * 4)] : undefined;
-      room.send('play', { cardId: card.id, color });
+      // 0/7 規則出 7：隨便挑一個還在場上的人換
+      const others = g.players.filter((p) => p.id !== v.you && !p.out);
+      const targetId = isSwapSeven(g.sevenZero, card) ? others[Math.floor(Math.random() * others.length)]?.id : undefined;
+      room.send('play', { cardId: card.id, color, targetId });
     } else if (g.hasDrawn) {
       room.send('pass');
     } else {

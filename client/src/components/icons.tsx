@@ -263,3 +263,18 @@ export const InfinityIcon = (p: P) => (
     <path d="M12 12c-2-3-4-4-6-4a4 4 0 000 8c2 0 4-1 6-4s4-4 6-4a4 4 0 010 8c-2 0-4-1-6-4z" />
   </Svg>
 );
+
+/** 整局限時：時鐘 */
+export const ClockIcon = (p: P) => (
+  <Svg {...p}>
+    <circle cx="12" cy="12" r="9" fill="currentColor" fillOpacity={0.25} />
+    <path d="M12 7v5l3.5 2" />
+  </Svg>
+);
+
+/** 換手牌：一來一往的箭頭 */
+export const SwapIcon = (p: P) => (
+  <Svg {...p}>
+    <path d="M4 8h14l-4-4M20 16H6l4 4" strokeWidth={2.5} />
+  </Svg>
+);

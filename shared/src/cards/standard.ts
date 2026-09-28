@@ -1,4 +1,4 @@
-import { activeCount, addPendingDraw, reverseDirection } from '../state';
+import { activeCount, addPendingDraw, passHands, reverseDirection, swapHands } from '../state';
 import type { CardDef } from './def';
 
 export const standardCards: CardDef[] = [
@@ -10,6 +10,18 @@ export const standardCards: CardDef[] = [
     crazy: false,
     wild: false,
     count: 0, // 特別處理：每色一張 0、兩張 1~9
+    onPlay(ctx) {
+      // 0/7 規則（大廳可以開關）
+      const { state } = ctx;
+      if (!state.settings.sevenZero) return;
+      if (ctx.card.value === 0) {
+        passHands(state);
+        ctx.log('🔄 大家的手牌往下一家傳！');
+      } else if (ctx.card.value === 7 && ctx.target !== undefined) {
+        swapHands(state, ctx.playerIndex, ctx.target);
+        ctx.log(`🔀 ${ctx.player.name} 跟 ${state.players[ctx.target].name} 交換了手牌`);
+      }
+    },
   },
   {
     kind: 'skip',

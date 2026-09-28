@@ -34,6 +34,10 @@ export interface GameSettings {
   startingHand: number;
   /** 每回合秒數，時間到自動抽牌（0 = 不限時） */
   turnSeconds: number;
+  /** 整局幾分鐘，時間到手牌最少的人贏（0 = 不限時） */
+  gameMinutes: number;
+  /** 0/7 規則：出 0 大家的手牌往出牌方向傳，出 7 跟自己選的一個人交換手牌 */
+  sevenZero: boolean;
 }
 
 export interface PlayerState {
@@ -64,10 +68,19 @@ export interface GameState {
   pendingFrom: number | null;
   /** 這回合已經抽過一張牌了 */
   hasDrawn: boolean;
+  /** 最近一次換手牌（大風吹、0/7 規則），前端靠它放牌飛來飛去的動畫 */
+  handSwap: HandSwap | null;
   winnerId: string | null;
   settings: GameSettings;
   log: string[];
   nextCardId: number;
+}
+
+export interface HandSwap {
+  /** 每換一次 +1 */
+  seq: number;
+  /** 誰的整手牌給了誰 */
+  moves: [from: string, to: string][];
 }
 
 /** 傳給單一玩家的畫面資料（看不到別人的手牌） */
@@ -90,6 +103,9 @@ export interface GameView {
   turnId: string;
   pendingDraw: number;
   hasDrawn: boolean;
+  handSwap: HandSwap | null;
+  /** 這局有沒有開 0/7 規則（出 7 要選人） */
+  sevenZero: boolean;
   drawPileCount: number;
   winnerId: string | null;
   log: string[];
@@ -111,12 +127,16 @@ export interface RoomView {
   game: GameView | null;
   /** 距離這回合時間到還有幾毫秒（null = 不限時） */
   turnMsLeft: number | null;
+  /** 距離整局時間到還有幾毫秒（null = 不限時） */
+  gameMsLeft: number | null;
 }
 
 // ---- client → server 訊息 ----
 export interface PlayMsg {
   cardId: string;
   color?: Color;
+  /** 0/7 規則出 7：要跟誰換手牌 */
+  targetId?: string;
 }
 export interface CatchMsg {
   targetId: string;

@@ -1,5 +1,5 @@
 /**
- * 自動打一整局：桌機房主 + 手機玩家 + 1 個機器人，全部怪牌打開。
+ * 自動打一整局：桌機房主 + 手機玩家 + 1 個機器人，全部怪牌打開，也開 0/7 規則和整局限時。
  * 途中截圖、檢查瀏覽器 console 有沒有錯誤，並用真的滑鼠點一次 3D 手牌。
  * 要先開著 npm run dev。
  *
@@ -59,6 +59,10 @@ try {
   await host.eval(`(() => { const b = document.querySelectorAll('.stepper')[2].querySelector('.step-btn'); for (let i = 0; i < 8; i++) b.click(); })()`);
   await host.waitFor(`!!document.querySelectorAll('.stepper')[2].querySelector('.stepper-value svg')`, 8000);
   await host.waitFor(`document.querySelectorAll('.crazy-card.on').length === 5`, 8000);
+  // 0/7 規則、整局限時 5 分鐘
+  await host.click('.rule-card');
+  await host.eval(`document.querySelectorAll('.stepper')[3].querySelectorAll('.step-btn')[1].click()`);
+  await host.waitFor(`!!document.querySelector('.rule-card.on') && document.querySelectorAll('.stepper')[3].innerText.includes('5')`, 8000);
   await sleep(1200);
   await shot(host, 'lobby');
   await shot(phone, 'lobby-mobile');
@@ -69,6 +73,7 @@ try {
   await shot(host, 'deal');
   // 軟體算圖第一格要等比較久
   await sleep(5000);
+  if (!(await host.eval(`!!document.querySelector('.game-clock')`))) throw new Error('沒有整局倒數');
   await shot(host, 'table');
   await shot(phone, 'table-mobile');
 
@@ -87,7 +92,11 @@ try {
       await sleep(1800);
     }
   }
-  // 畫質按鈕：切到省電再切回來
+  // 畫質按鈕：切到省電再切回來（軟體算圖太慢可能已經自動換成省電了，先切回高畫質）
+  if (await host.eval(`!!document.querySelector('.icon-btn.eco')`)) {
+    await host.eval(`document.querySelector('.hud-right .icon-btn').click()`);
+    await host.waitFor(`!document.querySelector('.icon-btn.eco')`, 5000);
+  }
   await host.eval(`document.querySelector('.hud-right .icon-btn').click()`);
   await host.waitFor(`localStorage.getItem('crazyuno:quality') === 'low' && !!document.querySelector('.icon-btn.eco')`, 5000);
   await sleep(4000);
@@ -125,7 +134,8 @@ async function playGame(host, phone) {
         ended: g.phase === 'ended',
         myTurn: g.phase === 'playing' && g.turnId === v.you,
         playable: g.playable,
-        hand: (g.hand ?? []).map(c => ({ id: c.id, wild: ['wild','wild4','draw99','dice','swapAll'].includes(c.kind) })),
+        hand: (g.hand ?? []).map(c => ({ id: c.id, wild: ['wild','wild4','draw99','dice','swapAll'].includes(c.kind), seven: g.sevenZero && c.kind === 'number' && c.value === 7 })),
+        others: g.players.filter(p => p.id !== v.you && !p.out).map(p => p.id),
         hasDrawn: g.hasDrawn,
         pending: g.pendingDraw,
         unoSafe: g.players.find(p => p.id === v.you)?.unoSafe,
@@ -180,9 +190,28 @@ async function playGame(host, phone) {
     return '萬用牌：先飛到中間，點菱形選了顏色，牌出掉了';
   };
 
+  // 0/7 規則的 7：牌飛到中間、對手身上冒出換牌按鈕，真的用滑鼠點一個
+  const trySeven = async (page, cardId) => {
+    const before = await state(page);
+    await page.eval(`window.__uno.play(window.__uno.view.game.hand.find(c => c.id === ${JSON.stringify(cardId)}))`);
+    await page.waitFor(`!!document.querySelector('.swap-btn')`, 8000);
+    await sleep(1500);
+    await shot(page, 'target');
+    const r = await page.eval(`(() => { const b = document.querySelector('.swap-btn').getBoundingClientRect(); return { x: b.x + b.width / 2, y: b.y + b.height / 2 }; })()`);
+    for (const type of ['mouseMoved', 'mousePressed', 'mouseReleased']) {
+      await page.send('Input.dispatchMouseEvent', { type, x: r.x, y: r.y, button: 'left', clickCount: 1 });
+    }
+    await page.waitFor(`!window.__uno.view.game.hand.some(c => c.id === ${JSON.stringify(cardId)})`, 8000);
+    await sleep(900);
+    await shot(page, 'swapped');
+    const after = await state(page);
+    return `7：點換牌按鈕換了手牌（${before.hand.length - 1} 張 → ${after.hand.length} 張）`;
+  };
+
   const toasts = new Set();
   let realClickDone = false;
   let wildDone = false;
+  let sevenDone = false;
   let moves = 0;
   let ended = false;
   const deadline = Date.now() + 200_000;
@@ -210,7 +239,11 @@ async function playGame(host, phone) {
 
       if (s.hand.length <= 2 && !s.unoSafe) await page.eval(`window.__uno.send('uno')`);
       const wildCard = s.hand.find((c) => c.wild && s.playable.includes(c.id));
-      if (!wildDone && wildCard) {
+      const sevenCard = s.hand.find((c) => c.seven && s.playable.includes(c.id));
+      if (!sevenDone && sevenCard && s.others.length > 1 && s.hand.length > 1) {
+        sevenDone = true;
+        console.log(`${name}：`, await trySeven(page, sevenCard.id));
+      } else if (!wildDone && wildCard) {
         wildDone = true;
         console.log(`${name}：`, await tryWild(page, wildCard.id));
       } else if (!realClickDone && name === 'host' && s.playable.length) {
@@ -218,7 +251,8 @@ async function playGame(host, phone) {
         console.log('真的滑鼠點擊：', await tryRealClick(page, w, h));
       } else if (s.playable.length) {
         const card = s.hand.find((c) => c.id === s.playable[0]);
-        await page.eval(`window.__uno.send('play', ${JSON.stringify(card.wild ? { cardId: card.id, color: 'red' } : { cardId: card.id })})`);
+        const msg = { cardId: card.id, color: card.wild ? 'red' : undefined, targetId: card.seven ? s.others[0] : undefined };
+        await page.eval(`window.__uno.send('play', ${JSON.stringify(msg)})`);
         await once(`play-${name}`, async () => { await sleep(260); await shot(page, `flying-${name}`); });
       } else if (!s.hasDrawn) {
         await page.eval(`window.__uno.send('draw')`);
@@ -230,6 +264,6 @@ async function playGame(host, phone) {
     }
     await sleep(250);
   }
-  console.log(`打完了嗎：${ended}，動作數：${moves}`);
+  console.log(`打完了嗎：${ended}，動作數：${moves}，有測到 7 換牌：${sevenDone}`);
   console.log('伺服器錯誤訊息：', [...toasts]);
 }

@@ -12,6 +12,7 @@ import {
   passTurn,
   playCard,
   sayUno,
+  timeUp,
   type CardKind,
   type CatchMsg,
   type GameSettings,
@@ -76,6 +77,10 @@ export class UnoRoom extends Room {
   private turnTimer: Timer | null = null;
   private timerSeq = -1;
   private turnEndsAt = 0;
+  private gameTimer: Timer | null = null;
+  /** 正在計時的是哪一局 */
+  private timedGame: GameState | null = null;
+  private gameEndsAt = 0;
   private botTimer: Timer | null = null;
   private botStep = '';
   private disposeTimer: Timer | null = null;
@@ -95,9 +100,11 @@ export class UnoRoom extends Room {
         if (patch.handLimit !== undefined) s.handLimit = clamp(patch.handLimit, 0, 200, s.handLimit);
         if (patch.startingHand !== undefined) s.startingHand = clamp(patch.startingHand, 1, 20, s.startingHand);
         if (patch.turnSeconds !== undefined) s.turnSeconds = clamp(patch.turnSeconds, 0, 120, s.turnSeconds);
+        if (patch.gameMinutes !== undefined) s.gameMinutes = clamp(patch.gameMinutes, 0, 60, s.gameMinutes);
+        if (typeof patch.sevenZero === 'boolean') s.sevenZero = patch.sevenZero;
       }),
 
-    // 下面兩個是「相對」的改法：連點好幾下時伺服器照順序改，不會被還沒更新的畫面蓋掉
+    // 下面三個是「相對」的改法：連點好幾下時伺服器照順序改，不會被還沒更新的畫面蓋掉
     toggleCrazy: (client: Client, kind: CardKind) =>
       this.handle(client, () => {
         this.requireHost(client);
@@ -107,11 +114,17 @@ export class UnoRoom extends Room {
         s.crazyCards = CRAZY_KINDS.filter((k) => (k === kind ? !on : s.crazyCards.includes(k)));
       }),
 
-    adjust: (client: Client, msg: { key: 'startingHand' | 'handLimit' | 'turnSeconds'; delta: number }) =>
+    toggleSevenZero: (client: Client) =>
+      this.handle(client, () => {
+        this.requireHost(client);
+        this.settings.sevenZero = !this.settings.sevenZero;
+      }),
+
+    adjust: (client: Client, msg: { key: 'startingHand' | 'handLimit' | 'turnSeconds' | 'gameMinutes'; delta: number }) =>
       this.handle(client, () => {
         this.requireHost(client);
         const s = this.settings;
-        const range = { startingHand: [1, 20], handLimit: [0, 200], turnSeconds: [0, 120] } as const;
+        const range = { startingHand: [1, 20], handLimit: [0, 200], turnSeconds: [0, 120], gameMinutes: [0, 60] } as const;
         const r = range[msg?.key];
         if (!r || !Number.isFinite(msg.delta)) return;
         s[msg.key] = clamp(s[msg.key] + msg.delta, r[0], r[1], s[msg.key]);
@@ -287,6 +300,7 @@ export class UnoRoom extends Room {
 
   private sync() {
     this.updateTurnTimer();
+    this.updateGameTimer();
     this.updateBot();
     for (const client of this.clients) {
       const seatId = this.sessionSeat.get(client.sessionId);
@@ -303,6 +317,7 @@ export class UnoRoom extends Room {
       settings: this.settings,
       game: this.game ? getView(this.game, seatId) : null,
       turnMsLeft: timed ? Math.max(0, this.turnEndsAt - Date.now()) : null,
+      gameMsLeft: this.gameTimer ? Math.max(0, this.gameEndsAt - Date.now()) : null,
     };
   }
 
@@ -328,6 +343,25 @@ export class UnoRoom extends Room {
       this.timerSeq = -1; // 就算 autoMove 沒換人也要重新計時
       this.sync();
     }, seconds * 1000);
+  }
+
+  /** 整局限時：開局就開始倒數，時間到比誰手牌最少 */
+  private updateGameTimer() {
+    const game = this.game?.phase === 'playing' && this.game.settings.gameMinutes > 0 ? this.game : null;
+    if (game === this.timedGame) return;
+
+    this.gameTimer?.clear();
+    this.gameTimer = null;
+    this.timedGame = game;
+    if (!game) return;
+    const ms = game.settings.gameMinutes * 60_000;
+    this.gameEndsAt = Date.now() + ms;
+    this.gameTimer = this.clock.setTimeout(() => {
+      this.gameTimer = null;
+      if (this.game !== game) return;
+      timeUp(game);
+      this.sync();
+    }, ms);
   }
 
   /** 輪到離線的人：過一下子讓機器人幫他走一步 */

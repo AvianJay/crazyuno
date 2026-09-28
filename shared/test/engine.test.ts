@@ -12,6 +12,7 @@ import {
   playCard,
   removePlayer,
   sayUno,
+  timeUp,
   type Card,
   type CardKind,
   type Color,
@@ -201,6 +202,118 @@ describe('大風吹', () => {
     expect(state.players[1].hand).toEqual(h0Rest);
     expect(state.players[2].hand).toBe(h1);
     expect(state.players[0].hand).toBe(h2);
+  });
+});
+
+describe('0/7 規則', () => {
+  const sevenZero = { sevenZero: true };
+
+  it('沒開的話 0 跟 7 就是普通的數字牌', () => {
+    const red0 = card('number', 'red', 0);
+    const h1 = filler();
+    const state = setup([[red0, ...filler()], h1, filler()]);
+    playCard(state, 'p0', { cardId: red0.id });
+    expect(state.players[1].hand).toBe(h1);
+    expect(state.handSwap).toBeNull();
+  });
+
+  it('出 0：大家的手牌往出牌方向傳給下一家', () => {
+    const red0 = card('number', 'red', 0);
+    const rest = card('number', 'red', 1);
+    const h1 = filler();
+    const h2 = [card('number', 'green', 9)];
+    const state = setup([[red0, rest], h1, h2], undefined, sevenZero);
+    state.players[2].unoSafe = true;
+    playCard(state, 'p0', { cardId: red0.id });
+    expect(state.players[1].hand).toEqual([rest]);
+    expect(state.players[2].hand).toBe(h1);
+    expect(state.players[0].hand).toBe(h2);
+    expect(state.players[2].unoSafe).toBe(false);
+    expect(state.handSwap?.moves).toEqual([
+      ['p0', 'p1'],
+      ['p1', 'p2'],
+      ['p2', 'p0'],
+    ]);
+  });
+
+  it('出 0：反方向的時候往另一邊傳', () => {
+    const red0 = card('number', 'red', 0);
+    const h1 = filler();
+    const h2 = [card('number', 'green', 9)];
+    const state = setup([[red0, card('number', 'red', 1)], h1, h2], undefined, sevenZero);
+    state.direction = -1;
+    playCard(state, 'p0', { cardId: red0.id });
+    expect(state.players[0].hand).toBe(h1);
+    expect(state.players[1].hand).toBe(h2);
+  });
+
+  it('出 7：跟自己選的人交換手牌', () => {
+    const red7 = card('number', 'red', 7);
+    const rest = card('number', 'red', 1);
+    const h2 = [card('number', 'green', 9)];
+    const state = setup([[red7, rest, card('number', 'red', 2)], filler(), h2], undefined, sevenZero);
+    expect(() => playCard(state, 'p0', { cardId: red7.id })).toThrow('換手牌');
+    expect(() => playCard(state, 'p0', { cardId: red7.id, targetId: 'p0' })).toThrow('換手牌');
+    playCard(state, 'p0', { cardId: red7.id, targetId: 'p2' });
+    expect(state.players[0].hand).toBe(h2);
+    expect(state.players[2].hand.map((c) => c.id)).toContain(rest.id);
+    expect(state.players[2].hand).toHaveLength(2);
+    expect(state.handSwap?.moves).toEqual([
+      ['p0', 'p2'],
+      ['p2', 'p0'],
+    ]);
+    expect(state.turn).toBe(1);
+  });
+
+  it('出 7：不能選已經出局的人；只剩一個對手就不用選', () => {
+    const red7 = card('number', 'red', 7);
+    const h1 = filler();
+    const state = setup([[red7, card('number', 'red', 1)], h1, filler()], undefined, sevenZero);
+    state.players[2].out = true;
+    expect(() => playCard(state, 'p0', { cardId: red7.id, targetId: 'p2' })).toThrow('換手牌');
+    playCard(state, 'p0', { cardId: red7.id });
+    expect(state.players[0].hand).toBe(h1);
+    expect(state.players[1].hand).toHaveLength(1);
+  });
+
+  it('最後一張出 7 直接贏，不用選人', () => {
+    const red7 = card('number', 'red', 7);
+    const state = setup([[red7], filler(), filler()], undefined, sevenZero);
+    playCard(state, 'p0', { cardId: red7.id });
+    expect(state.phase).toBe('ended');
+    expect(state.winnerId).toBe('p0');
+  });
+
+  it('機器人出 7 會找手牌最少的人換', () => {
+    const red7 = card('number', 'red', 7);
+    const small = [card('number', 'green', 9)];
+    const state = setup([[red7, ...filler()], filler(), small], undefined, sevenZero);
+    botMove(state);
+    expect(state.discardPile.at(-1)).toBe(red7);
+    expect(state.players[0].hand).toBe(small);
+  });
+});
+
+describe('整局時間到', () => {
+  it('手牌最少的人贏', () => {
+    const state = setup([filler(), [card('number', 'red', 1)], filler()]);
+    timeUp(state);
+    expect(state.phase).toBe('ended');
+    expect(state.winnerId).toBe('p1');
+  });
+
+  it('張數一樣比點數，出局的人不算', () => {
+    const state = setup([[card('number', 'red', 9)], [card('skip', 'red')], [card('number', 'red', 3)], []]);
+    state.players[3].out = true;
+    timeUp(state);
+    expect(state.winnerId).toBe('p2');
+  });
+
+  it('張數、點數都一樣就平手', () => {
+    const state = setup([[card('number', 'red', 4)], [card('number', 'blue', 4)]]);
+    timeUp(state);
+    expect(state.phase).toBe('ended');
+    expect(state.winnerId).toBeNull();
   });
 });
 

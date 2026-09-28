@@ -7,6 +7,7 @@ import { Avatar } from './Avatar';
 import {
   BoltIcon,
   BombIcon,
+  ClockIcon,
   CrownIcon,
   HandIcon,
   HourglassIcon,
@@ -16,6 +17,7 @@ import {
   PlayersIcon,
   PlayIcon,
   PlusIcon,
+  SwapIcon,
   TimerIcon,
 } from './icons';
 import { LegalLinks } from './Legal';
@@ -33,7 +35,7 @@ export function Lobby({ view, send }: { view: RoomView; send: Send }) {
     sfx.flick();
     send('toggleCrazy', kind);
   };
-  const adjust = (key: 'startingHand' | 'handLimit' | 'turnSeconds') => (delta: number) => {
+  const adjust = (key: 'startingHand' | 'handLimit' | 'turnSeconds' | 'gameMinutes') => (delta: number) => {
     sfx.hover();
     send('adjust', { key, delta });
   };
@@ -108,7 +110,36 @@ export function Lobby({ view, send }: { view: RoomView; send: Send }) {
           </div>
         </section>
 
-        <section className="panel steppers" style={{ '--i': 2 } as CSSProperties}>
+        <section className="panel" style={{ '--i': 2 } as CSSProperties}>
+          <h2 className="panel-head">
+            <SwapIcon className="rules-icon" />
+            {!isHost && <LockIcon className="lock" />}
+          </h2>
+          <div className="crazy-grid">
+            <button
+              className={`rule-card ${s.sevenZero ? 'on' : ''}`}
+              disabled={!isHost}
+              onClick={() => {
+                sfx.flick();
+                send('toggleSevenZero');
+              }}
+              title="0/7 換牌：出 0 大家的手牌往出牌方向傳，出 7 選一個人交換手牌"
+              style={{ '--i': 0 } as CSSProperties}
+            >
+              <div className="flip">
+                <div className="front pair">
+                  <img src={faceImage({ kind: 'number', color: 'blue', value: 0 })} alt="0" />
+                  <img src={faceImage({ kind: 'number', color: 'red', value: 7 })} alt="7" />
+                </div>
+                <img className="back" src={backImage()} alt="" />
+              </div>
+              <span className="crazy-name">0/7 換牌</span>
+              <span className="crazy-desc">出 0：大家的手牌往出牌方向傳。出 7：選一個人交換手牌。</span>
+            </button>
+          </div>
+        </section>
+
+        <section className="panel steppers" style={{ '--i': 3 } as CSSProperties}>
           <Stepper
             icon={<HandIcon />}
             title="起始手牌"
@@ -139,6 +170,17 @@ export function Lobby({ view, send }: { view: RoomView; send: Send }) {
             editable={isHost}
             onStep={adjust('turnSeconds')}
           />
+          <Stepper
+            icon={<ClockIcon />}
+            title="整局幾分鐘，時間到手牌最少的人贏（∞ = 不限時）"
+            value={s.gameMinutes}
+            unit="分"
+            step={5}
+            min={0}
+            max={60}
+            editable={isHost}
+            onStep={adjust('gameMinutes')}
+          />
         </section>
 
         {isHost ? (
@@ -167,6 +209,8 @@ function Stepper(props: {
   icon: ReactNode;
   title: string;
   value: number;
+  /** 數字後面的小單位 */
+  unit?: string;
   step: number;
   min: number;
   max: number;
@@ -184,7 +228,14 @@ function Stepper(props: {
       )}
       {/* key 讓數字每次變都重播跳動的動畫 */}
       <span key={value} className="stepper-value">
-        {value === 0 && min === 0 ? <InfinityIcon /> : value}
+        {value === 0 && min === 0 ? (
+          <InfinityIcon />
+        ) : (
+          <span>
+            {value}
+            {props.unit && <small className="stepper-unit">{props.unit}</small>}
+          </span>
+        )}
       </span>
       {props.editable && (
         <button className="step-btn" disabled={value >= max} onClick={() => props.onStep(step)} aria-label="增加">

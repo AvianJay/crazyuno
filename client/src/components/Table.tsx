@@ -1,4 +1,4 @@
-import { getCardDef, type Card, type Color, type GameView, type RoomView } from '@crazyuno/shared';
+import { getCardDef, isSwapSeven, type Card, type Color, type GameView, type RoomView } from '@crazyuno/shared';
 import { Canvas } from '@react-three/fiber';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import * as THREE from 'three';
@@ -15,6 +15,7 @@ import { chooseQuality, initialQuality, rememberAutoLow, type QualityState } fro
 import { Scene } from '../three/Scene';
 import { Avatar } from './Avatar';
 import {
+  ClockIcon,
   DeckIcon,
   DownIcon,
   EyeIcon,
@@ -38,7 +39,7 @@ import {
 interface FeedItem {
   id: number;
   who: string | null;
-  kind: 'play' | 'draw' | 'uno' | 'out' | 'caught' | 'timeout' | 'offline' | 'online';
+  kind: 'play' | 'draw' | 'uno' | 'out' | 'caught' | 'timeout' | 'timeUp' | 'offline' | 'online';
   card?: Card;
   n?: number;
 }
@@ -59,15 +60,16 @@ function toFeed(e: GameEvent): FeedItem | null {
     case 'timeout':
       return { id: feedId++, who: e.id, kind: 'timeout' };
     case 'caught':
-      return { id: feedId++, who: null, kind: 'caught' };
+    case 'timeUp':
+      return { id: feedId++, who: null, kind: e.t };
     default:
       return null;
   }
 }
 
 export function Table({ view, game, send }: { view: RoomView; game: GameView; send: Send }) {
-  /** 出了萬用牌、還沒選顏色（chosen = 已經選了，等伺服器回應） */
-  const [wild, setWild] = useState<{ card: Card; chosen: boolean } | null>(null);
+  /** 出了萬用牌還沒選顏色、出了 7 還沒選人（chosen = 已經選了，等伺服器回應） */
+  const [pending, setPending] = useState<{ card: Card; chosen: boolean } | null>(null);
   const [muted, setMuted] = useState(sfx.isMuted());
   const [feed, setFeed] = useState<FeedItem[]>([]);
   const [quality, setQuality] = useState<QualityState>(initialQuality);
@@ -102,18 +104,20 @@ export function Table({ view, game, send }: { view: RoomView; game: GameView; se
     if (import.meta.env.DEV) Object.assign(window, { __uno: { view, send, emitFx, play } });
   }, [view, send]);
 
-  // 輪到別人、牌已經出掉了，就把萬用牌的狀態清掉（還在手上的話會飛回去）
+  // 輪到別人、牌已經出掉了，就把選到一半的牌清掉（還在手上的話會飛回去）
   useEffect(() => {
-    if (wild && (!myTurn || !hand.some((c) => c.id === wild.card.id))) setWild(null);
-  }, [wild, myTurn, hand]);
-  // 選了顏色但伺服器沒接受（例如剛好時間到），牌飛回手上
+    if (pending && (!myTurn || !hand.some((c) => c.id === pending.card.id))) setPending(null);
+  }, [pending, myTurn, hand]);
+  // 選了但伺服器沒接受（例如剛好時間到），牌飛回手上
   useEffect(() => {
-    if (!wild?.chosen) return;
-    const t = setTimeout(() => setWild(null), 2500);
+    if (!pending?.chosen) return;
+    const t = setTimeout(() => setPending(null), 2500);
     return () => clearTimeout(t);
-  }, [wild]);
-  // 牌飛到中間之後，四個顏色菱形才冒出來
-  const picking = useDelayed(!!wild && !wild.chosen, 380);
+  }, [pending]);
+  // 牌飛到中間之後，四個顏色菱形（或對手身上的換牌按鈕）才冒出來
+  const choosing = pending && !pending.chosen ? pending.card : null;
+  const picking = useDelayed(!!choosing && getCardDef(choosing.kind).wild, 380);
+  const targeting = useDelayed(!!choosing && !getCardDef(choosing.kind).wild, 380);
 
   // 最後五秒滴答
   useEffect(() => {
@@ -125,19 +129,28 @@ export function Table({ view, game, send }: { view: RoomView; game: GameView; se
 
   const play = (card: Card) => {
     if (!myTurn) return;
-    if (getCardDef(card.kind).wild) {
+    // 出 7 換牌：場上只剩一個對手就不用選，伺服器會直接跟他換；最後一張也不用換
+    const others = game.players.filter((p) => p.id !== view.you && !p.out);
+    const chooseTarget = isSwapSeven(game.sevenZero, card) && others.length > 1 && hand.length > 1;
+    if (getCardDef(card.kind).wild || chooseTarget) {
       sfx.whoosh(0.3);
-      setWild({ card, chosen: false });
+      setPending({ card, chosen: false });
     } else {
-      setWild(null);
+      setPending(null);
       send('play', { cardId: card.id });
     }
   };
 
   const pickColor = (color: Color) => {
-    if (!wild || wild.chosen) return;
-    send('play', { cardId: wild.card.id, color });
-    setWild({ ...wild, chosen: true });
+    if (!pending || pending.chosen) return;
+    send('play', { cardId: pending.card.id, color });
+    setPending({ ...pending, chosen: true });
+  };
+
+  const pickTarget = (targetId: string) => {
+    if (!pending || pending.chosen) return;
+    send('play', { cardId: pending.card.id, targetId });
+    setPending({ ...pending, chosen: true });
   };
 
   // 跑不動或顯示卡記憶體不夠：自動換成省電（玩家自己選過高畫質就尊重他，除非 WebGL 真的掛了）
@@ -171,7 +184,7 @@ export function Table({ view, game, send }: { view: RoomView; game: GameView; se
         // alpha: false = 不透明的畫布：手機合成畫面比較省，也不會有透明的一格露出後面的黑底
         gl={{ alpha: false, antialias: false, powerPreference: 'high-performance', stencil: false, toneMapping: THREE.NeutralToneMapping }}
         onPointerMissed={() => {
-          if (wild && !wild.chosen) setWild(null);
+          if (pending && !pending.chosen) setPending(null);
         }}
       >
         <Scene
@@ -179,12 +192,14 @@ export function Table({ view, game, send }: { view: RoomView; game: GameView; se
           game={game}
           events={events}
           round={round.current}
-          pendingWild={wild?.card ?? null}
+          pendingCard={pending?.card ?? null}
           picking={picking}
           onPickColor={pickColor}
+          targeting={targeting}
+          onPickTarget={pickTarget}
           onPlay={play}
           onDraw={() => {
-            setWild(null);
+            setPending(null);
             send('draw');
           }}
           onCatch={(targetId) => send('catch', { targetId })}
@@ -216,6 +231,8 @@ export function Table({ view, game, send }: { view: RoomView; game: GameView; se
           </>
         )}
       </div>
+
+      {view.gameMsLeft !== null && game.phase === 'playing' && <GameClock msLeft={view.gameMsLeft} />}
 
       <div className="hud-right">
         {secondsLeft !== null && game.phase === 'playing' && (
@@ -261,6 +278,7 @@ export function Table({ view, game, send }: { view: RoomView; game: GameView; se
               {f.kind === 'out' && <SkullIcon className="feed-icon danger" />}
               {f.kind === 'caught' && <SirenIcon className="feed-icon danger" />}
               {f.kind === 'timeout' && <TimerIcon className="feed-icon" />}
+              {f.kind === 'timeUp' && <ClockIcon className="feed-icon danger" />}
               {f.kind === 'offline' && <RobotIcon className="feed-icon bot" />}
               {f.kind === 'online' && <WaveIcon className="feed-icon back" />}
             </div>
@@ -328,6 +346,37 @@ function TimerRing({ left, total }: { left: number; total: number }) {
         <circle cx="20" cy="20" r={r} className="bar" strokeDasharray={`${c * frac} ${c}`} transform="rotate(-90 20 20)" />
       </svg>
       <span>{left}</span>
+    </div>
+  );
+}
+
+/**
+ * 整局剩下的時間。自己一個元件，每秒跳動的時候不用重畫整張牌桌。
+ * 剩一分鐘跳警告，最後十秒滴答。
+ */
+function GameClock({ msLeft }: { msLeft: number }) {
+  const left = useCountdown(msLeft, 'game');
+  const warned = useRef(msLeft <= 60_000);
+
+  useEffect(() => {
+    if (left === null || left > 60 || left <= 0) return;
+    if (!warned.current) {
+      warned.current = true;
+      sfx.alarm();
+      emitFx({ kind: 'text', text: '⌛ 剩 1 分鐘！', tone: 'danger' });
+    }
+    if (left <= 10) sfx.tick(left <= 3);
+  }, [left]);
+
+  if (left === null) return null;
+  const m = Math.floor(left / 60);
+  const sec = String(left % 60).padStart(2, '0');
+  return (
+    <div className={`game-clock ${left <= 60 ? 'hurry' : ''}`} aria-label={`整局剩 ${m} 分 ${sec} 秒`}>
+      <ClockIcon />
+      <span key={left <= 10 ? left : 0}>
+        {m}:{sec}
+      </span>
     </div>
   );
 }

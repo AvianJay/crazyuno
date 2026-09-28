@@ -13,6 +13,8 @@ export interface EffectContext {
   advance: number;
   /** 直接指定下一個輪到誰（player index），會蓋過 advance */
   nextTurn?: number;
+  /** 出牌的人指定的對象（player index）：0/7 規則的 7 要選跟誰換手牌 */
+  target?: number;
 }
 
 export interface CardDef {

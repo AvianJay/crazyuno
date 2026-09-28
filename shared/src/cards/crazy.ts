@@ -1,4 +1,4 @@
-import { activeCount, addPendingDraw, nextActive, reverseDirection } from '../state';
+import { activeCount, addPendingDraw, passHands, reverseDirection } from '../state';
 import type { CardDef } from './def';
 
 /**
@@ -85,14 +85,7 @@ export const crazyCards: CardDef[] = [
     wild: true,
     count: 2,
     onPlay(ctx) {
-      const { state } = ctx;
-      const active = state.players.map((_, i) => i).filter((i) => !state.players[i].out);
-      const hands = active.map((i) => state.players[i].hand);
-      for (let k = 0; k < active.length; k++) {
-        const to = nextActive(state, active[k]);
-        state.players[to].hand = hands[k];
-      }
-      for (const p of state.players) p.unoSafe = false;
+      passHands(ctx.state);
       ctx.log('🌀 大風吹！大家的手牌都換人了');
     },
   },

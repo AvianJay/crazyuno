@@ -24,6 +24,37 @@ export function addPendingDraw(state: GameState, amount: number, fromIndex: numb
   state.pendingFrom = fromIndex;
 }
 
+/** 所有還在場上的人把整手牌傳給下一家（照目前方向），傳完大家都要重喊 LAST! */
+export function passHands(state: GameState): void {
+  const active = state.players.map((_, i) => i).filter((i) => !state.players[i].out);
+  const hands = active.map((i) => state.players[i].hand);
+  const moves: [string, string][] = [];
+  for (let k = 0; k < active.length; k++) {
+    const to = nextActive(state, active[k]);
+    state.players[to].hand = hands[k];
+    moves.push([state.players[active[k]].id, state.players[to].id]);
+  }
+  for (const p of state.players) p.unoSafe = false;
+  recordSwap(state, moves);
+}
+
+/** 兩個人交換整手牌 */
+export function swapHands(state: GameState, a: number, b: number): void {
+  const pa = state.players[a];
+  const pb = state.players[b];
+  [pa.hand, pb.hand] = [pb.hand, pa.hand];
+  pa.unoSafe = false;
+  pb.unoSafe = false;
+  recordSwap(state, [
+    [pa.id, pb.id],
+    [pb.id, pa.id],
+  ]);
+}
+
+function recordSwap(state: GameState, moves: [string, string][]): void {
+  state.handSwap = { seq: (state.handSwap?.seq ?? 0) + 1, moves };
+}
+
 export function reverseDirection(state: GameState): void {
   state.direction = state.direction === 1 ? -1 : 1;
 }

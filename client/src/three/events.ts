@@ -8,13 +8,16 @@ export type GameEvent =
   | { t: 'stack'; total: number }
   | { t: 'color'; color: Color }
   | { t: 'reverse' }
-  | { t: 'swap'; by: string }
+  /** 換手牌（大風吹、0/7 規則）：card 是造成換牌的那張，moves 是誰的整手牌給了誰 */
+  | { t: 'swap'; card: Card; moves: [from: string, to: string][] }
   | { t: 'mirror' }
   | { t: 'dice'; roll: number }
   | { t: 'out'; id: string }
   | { t: 'uno'; id: string }
   | { t: 'caught' }
   | { t: 'timeout'; id: string }
+  /** 整局時間到 */
+  | { t: 'timeUp' }
   | { t: 'yourTurn' }
   /** 斷線了，機器人接手 */
   | { t: 'offline'; id: string }
@@ -36,22 +39,22 @@ export function diffViews(prev: RoomView | null, next: RoomView): GameEvent[] {
 
   const events: GameEvent[] = [];
   const played = b.topCard.id !== a.topCard.id;
-  const swapped = played && b.topCard.kind === 'swapAll';
+  const swap = b.handSwap && b.handSwap.seq !== a.handSwap?.seq ? b.handSwap : null;
 
   if (played) {
     // 只有輪到的人能出牌，所以出牌的是上一個畫面的 turnId
     events.push({ t: 'play', by: a.turnId, card: b.topCard });
     if (b.currentColor !== a.currentColor || getCardDef(b.topCard.kind).wild) events.push({ t: 'color', color: b.currentColor });
-    if (swapped) events.push({ t: 'swap', by: a.turnId });
   }
+  if (swap) events.push({ t: 'swap', card: b.topCard, moves: swap.moves });
   if (b.pendingDraw > a.pendingDraw) events.push({ t: 'stack', total: b.pendingDraw });
   if (b.direction !== a.direction) events.push({ t: 'reverse' });
 
   for (const p of b.players) {
     const old = a.players.find((q) => q.id === p.id);
     if (!old) continue;
-    // 大風吹會讓每個人的張數亂跳，不算抽牌
-    if (!swapped && p.handCount > old.handCount) events.push({ t: 'draw', id: p.id, n: p.handCount - old.handCount });
+    // 換手牌會讓張數亂跳，不算抽牌
+    if (!swap && p.handCount > old.handCount) events.push({ t: 'draw', id: p.id, n: p.handCount - old.handCount });
     if (p.out && !old.out) events.push({ t: 'out', id: p.id });
     if (p.unoSafe && !old.unoSafe) events.push({ t: 'uno', id: p.id });
   }
@@ -69,6 +72,7 @@ export function diffViews(prev: RoomView | null, next: RoomView): GameEvent[] {
     else if (line.startsWith('🪞')) events.push({ t: 'mirror' });
     else if (line.startsWith('🚨')) events.push({ t: 'caught' });
     else if (line.startsWith('⏰')) events.push({ t: 'timeout', id: a.turnId });
+    else if (line.startsWith('⌛')) events.push({ t: 'timeUp' });
   }
 
   if (a.phase === 'playing' && b.phase === 'ended') events.push({ t: 'end', winnerId: b.winnerId });

@@ -20,6 +20,8 @@ export const DEFAULT_SETTINGS: GameSettings = {
   handLimit: 30,
   startingHand: 7,
   turnSeconds: 30,
+  gameMinutes: 0,
+  sevenZero: false,
 };
 
 type Rng = () => number;
@@ -71,6 +73,7 @@ export function createGame(
     pendingDraw: 0,
     pendingFrom: null,
     hasDrawn: false,
+    handSwap: null,
     winnerId: null,
     settings,
     log: [],
@@ -124,6 +127,27 @@ export function canPlay(state: GameState, card: Card): boolean {
   const top = topCard(state);
   if (card.kind !== top.kind) return false;
   return card.kind !== 'number' || card.value === top.value;
+}
+
+/** 0/7 規則下的 7：出的人要選一個人交換手牌 */
+export function isSwapSeven(sevenZero: boolean, card: Pick<Card, 'kind' | 'value'>): boolean {
+  return sevenZero && card.kind === 'number' && card.value === 7;
+}
+
+/** 出 7 可以選的人：還在場上的其他人 */
+function swapCandidates(state: GameState, index: number): number[] {
+  return state.players.map((_, i) => i).filter((i) => i !== index && !state.players[i].out);
+}
+
+/** 檢查出 7 選的人（場上只剩一個對手就不用選）。不是換牌的 7 回傳 undefined */
+function swapTarget(state: GameState, index: number, card: Card, targetId: unknown): number | undefined {
+  // 最後一張出 7 直接贏，不用換
+  if (!isSwapSeven(state.settings.sevenZero, card) || state.players[index].hand.length === 1) return undefined;
+  const candidates = swapCandidates(state, index);
+  if (targetId === undefined && candidates.length === 1) return candidates[0];
+  const target = state.players.findIndex((p) => p.id === targetId);
+  if (!candidates.includes(target)) throw new GameError('選一個人跟你換手牌');
+  return target;
 }
 
 /**
@@ -204,6 +228,7 @@ export function playCard(state: GameState, playerId: string, msg: PlayMsg, rng: 
   }
   const def = getCardDef(card.kind);
   if (def.wild && !(msg.color && COLORS.includes(msg.color))) throw new GameError('請選一個顏色');
+  const target = swapTarget(state, index, card, msg.targetId);
 
   player.hand.splice(cardIndex, 1);
   state.discardPile.push(card);
@@ -223,6 +248,7 @@ export function playCard(state: GameState, playerId: string, msg: PlayMsg, rng: 
     rng,
     log: (m) => pushLog(state, m),
     advance: 1,
+    target,
   };
   def.onPlay?.(ctx);
   setTurn(state, ctx.nextTurn ?? nextActive(state, index, ctx.advance));
@@ -296,6 +322,27 @@ export function autoMove(state: GameState, rng: Rng = Math.random): void {
   if (state.phase === 'playing' && state.turnSeq === seq) passTurn(state, player.id);
 }
 
+/** 牌面點數：數字牌照數字，萬用牌 50，其他功能牌 20 */
+function cardPoints(card: Card): number {
+  if (card.kind === 'number') return card.value ?? 0;
+  return getCardDef(card.kind).wild ? 50 : 20;
+}
+
+/** 整局時間到：手牌最少的人贏；張數一樣就比點數，點數也一樣就平手 */
+export function timeUp(state: GameState): void {
+  if (state.phase !== 'playing') return;
+  const score = (i: number) => {
+    const hand = state.players[i].hand;
+    return hand.length * 10_000 + hand.reduce((sum, c) => sum + cardPoints(c), 0);
+  };
+  const alive = state.players.map((_, i) => i).filter((i) => !state.players[i].out);
+  const best = Math.min(...alive.map(score));
+  const leaders = alive.filter((i) => score(i) === best);
+  pushLog(state, '⌛ 整局時間到！手牌最少的人獲勝');
+  if (leaders.length > 1) pushLog(state, `🤝 ${leaders.map((i) => state.players[i].name).join('、')} 平手`);
+  endGame(state, leaders.length === 1 ? state.players[leaders[0]].id : null);
+}
+
 /**
  * 離線玩家由機器人代打：每呼叫一次走一步（出牌、抽牌或跳過），伺服器隔一下再叫下一步，看起來才像有人在玩。
  * 策略很簡單：先出手上最多的那個顏色的牌，萬用牌留著，+99 留到最後；選顏色就選手上最多的顏色。
@@ -319,7 +366,13 @@ export function botMove(state: GameState, rng: Rng = Math.random): void {
   const card = options.reduce((best, c) => (cost(c) < cost(best) ? c : best));
   if (player.hand.length === 2 && !player.unoSafe) sayUno(state, player.id);
   const color = getCardDef(card.kind).wild ? bestColor(player.hand.filter((c) => c !== card), rng) : undefined;
-  playCard(state, player.id, { cardId: card.id, color }, rng);
+  // 出 7 換牌就找手牌最少的人換
+  let targetId: string | undefined;
+  if (isSwapSeven(state.settings.sevenZero, card)) {
+    const others = swapCandidates(state, state.turn).map((i) => state.players[i]);
+    targetId = others.reduce((a, b) => (b.hand.length < a.hand.length ? b : a)).id;
+  }
+  playCard(state, player.id, { cardId: card.id, color, targetId }, rng);
 }
 
 function colorCounts(hand: Card[]): Record<Color, number> {
@@ -358,6 +411,8 @@ export function getView(state: GameState, viewerId: string): GameView {
     turnId: state.players[state.turn].id,
     pendingDraw: state.pendingDraw,
     hasDrawn: myTurn && state.hasDrawn,
+    handSwap: state.handSwap,
+    sevenZero: state.settings.sevenZero,
     drawPileCount: state.drawPile.length,
     winnerId: state.winnerId,
     log: state.log,
