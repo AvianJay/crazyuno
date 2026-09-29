@@ -24,6 +24,9 @@ export function direct(
   const seat = (id: string) => seats.get(id) ?? MY_SEAT;
   const pile = v(DISCARD, 0.1);
   const colorHex = COLOR_HEX[game.currentColor];
+  // 見者有份一次讓全桌都抽牌：抽牌聲只放一次，不然十個人的刷刷聲疊在一起
+  const everyone = events.some((e) => e.t === 'play' && e.card.kind === 'drawAll');
+  let drawSounded = false;
 
   for (const e of events) {
     switch (e.t) {
@@ -57,9 +60,43 @@ export function direct(
           emitFx({ kind: 'text', text: '⊘ 禁止！', color: hex }, 250);
         } else if (kind === 'double') {
           emitFx({ kind: 'text', text: '×2！', tone: 'danger' }, 250);
+        } else if (kind === 'drawAll') {
+          sfx.gift();
+          emitFx({ kind: 'text', text: '🎁 見者有份！', tone: 'gold' }, 250);
+          emitFx({ kind: 'ring', at: pile, color: hex, size: 8, life: 1.2 }, 300);
+          // 每個人頭上都炸一下：大家都有份
+          for (const p of game.players) {
+            if (p.id === e.by || p.out) continue;
+            emitFx({ kind: 'burst', at: v(seat(p.id), 1), colors: [hex, '#ffd34d', '#ffffff'], count: 90, speed: 3.5, up: 2 }, 450);
+          }
         }
         break;
       }
+
+      case 'sweep': {
+        const hex = e.cards[0]?.color ? COLOR_HEX[e.cards[0].color] : colorHex;
+        sfx.sweep(e.cards.length);
+        emitFx({ kind: 'text', text: `🧹 清倉！×${e.cards.length + 1}`, color: hex }, 250);
+        emitFx({ kind: 'burst', at: pile, colors: [hex, '#ffffff'], count: Math.min(400, 120 + e.cards.length * 40), speed: 5, up: 2.5 }, 300);
+        emitFx({ kind: 'ring', at: pile, color: hex, size: 5, life: 1 }, 300);
+        emitFx({ kind: 'shake', amount: Math.min(0.6, 0.15 + e.cards.length * 0.06) }, 300);
+        break;
+      }
+
+      // 判決的大字比「+N 張」早一點出來：疊在上面那行先講誰唬爛，下面那行才是誰吃牌
+      case 'challenge':
+        sfx.gavel();
+        if (e.guilty) {
+          sfx.whistle();
+          emitFx({ kind: 'flash', color: '#ff2020', strength: 0.4 }, 150);
+          emitFx({ kind: 'text', text: e.target === view.you ? '🎯 你被抓包了！' : `🎯 抓到 ${name(e.target)} 唬爛！`, tone: 'danger' }, 150);
+          emitFx({ kind: 'ring', at: v(seat(e.target), 0.05), color: '#ff2020', size: 4, life: 1.2 }, 150);
+        } else {
+          sfx.buzzer();
+          emitFx({ kind: 'text', text: `😇 ${name(e.target)} 是清白的！`, tone: 'gold' }, 150);
+          emitFx({ kind: 'ring', at: v(seat(e.target), 0.05), color: '#7dff9b', size: 4, life: 1.2 }, 150);
+        }
+        break;
 
       case 'stack':
         sfx.stack(e.total);
@@ -114,7 +151,8 @@ export function direct(
         break;
 
       case 'draw': {
-        sfx.drawCards(e.n);
+        if (!everyone || !drawSounded) sfx.drawCards(e.n);
+        drawSounded = true;
         if (e.n >= 4) {
           emitFx({ kind: 'text', text: `${name(e.id)} +${e.n} 張`, tone: e.n >= 10 ? 'danger' : 'normal' }, 200);
           emitFx({ kind: 'burst', at: v(seat(e.id), 1), colors: ['#ff3b3f', '#ffffff'], count: Math.min(300, 40 + e.n * 4), speed: 4 }, 400);

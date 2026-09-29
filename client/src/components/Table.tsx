@@ -1,4 +1,4 @@
-import { getCardDef, isSwapSeven, type Card, type Color, type GameView, type RoomView } from '@crazyuno/shared';
+import { canCallLast, getCardDef, isSwapSeven, type Card, type Color, type GameView, type RoomView } from '@crazyuno/shared';
 import { Canvas } from '@react-three/fiber';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import * as THREE from 'three';
@@ -17,7 +17,9 @@ import { useOverheated } from '../useDiscord';
 import { Avatar } from './Avatar';
 import { Fit } from './Fit';
 import {
+  CheckIcon,
   ClockIcon,
+  CloseIcon,
   DeckIcon,
   DownIcon,
   EyeIcon,
@@ -28,6 +30,7 @@ import {
   PassIcon,
   ReplayIcon,
   RobotIcon,
+  SearchIcon,
   SirenIcon,
   SkullIcon,
   SparkleIcon,
@@ -42,19 +45,28 @@ import { InviteButton } from './InviteButton';
 interface FeedItem {
   id: number;
   who: string | null;
-  kind: 'play' | 'draw' | 'uno' | 'out' | 'caught' | 'timeout' | 'timeUp' | 'offline' | 'online';
+  kind: 'play' | 'draw' | 'uno' | 'out' | 'caught' | 'timeout' | 'timeUp' | 'offline' | 'online' | 'challenge';
   card?: Card;
+  /** 抽了幾張；清倉是一次丟了幾張 */
   n?: number;
+  /** 質疑猜對了 */
+  ok?: boolean;
 }
 
 let feedId = 0;
 
-function toFeed(e: GameEvent): FeedItem | null {
+function toFeed(e: GameEvent, batch: GameEvent[]): FeedItem | null {
   switch (e.t) {
-    case 'play':
-      return { id: feedId++, who: e.by, kind: 'play', card: e.card };
+    case 'play': {
+      const sweep = batch.find((x) => x.t === 'sweep');
+      return { id: feedId++, who: e.by, kind: 'play', card: e.card, n: sweep ? sweep.cards.length + 1 : undefined };
+    }
     case 'draw':
+      // 見者有份讓全桌都抽 2 張，不用每個人都列一行
+      if (batch.some((x) => x.t === 'play' && x.card.kind === 'drawAll')) return null;
       return { id: feedId++, who: e.id, kind: 'draw', n: e.n };
+    case 'challenge':
+      return { id: feedId++, who: e.by, kind: 'challenge', ok: e.guilty };
     case 'uno':
     case 'out':
     case 'offline':
@@ -97,7 +109,7 @@ export function Table({ view, game, send }: { view: RoomView; game: GameView; se
     prev.current = view;
     const box = { width: labels.current.clientWidth || innerWidth, height: labels.current.clientHeight || innerHeight };
     direct(events, view, game, seatMap(game, view.you, box.width / box.height), box);
-    const add = events.map(toFeed).filter((f): f is FeedItem => f !== null);
+    const add = events.map((e) => toFeed(e, events)).filter((f): f is FeedItem => f !== null);
     if (events.some((e) => e.t === 'start' || e.t === 'rejoin')) setFeed(add);
     else if (add.length) setFeed((f) => [...f, ...add].slice(-5));
   }, [events, view, game]);
@@ -223,6 +235,10 @@ export function Table({ view, game, send }: { view: RoomView; game: GameView; se
             send('draw');
           }}
           onCatch={(targetId) => send('catch', { targetId })}
+          onChallenge={() => {
+            setPending(null);
+            send('challenge');
+          }}
           labels={labels}
           quality={quality.quality}
           onSlow={onSlow}
@@ -291,6 +307,13 @@ export function Table({ view, game, send }: { view: RoomView; game: GameView; se
             <div key={f.id} className={`feed-item ${f.kind}`}>
               {p && <Avatar name={p.name} src={p.avatar} />}
               {f.kind === 'play' && f.card && <img className="feed-card" src={faceImage(f.card)} alt="" />}
+              {f.kind === 'play' && f.n && <span className="feed-mult">×{f.n}</span>}
+              {f.kind === 'challenge' && (
+                <span className={`feed-challenge ${f.ok ? 'ok' : 'bad'}`}>
+                  <SearchIcon />
+                  {f.ok ? <CheckIcon /> : <CloseIcon />}
+                </span>
+              )}
               {f.kind === 'draw' && (
                 <span className="feed-draw">
                   <DeckIcon />+{f.n}
@@ -316,7 +339,7 @@ export function Table({ view, game, send }: { view: RoomView; game: GameView; se
                 <PassIcon />
               </button>
             )}
-            <button className={`uno-btn ${hand.length <= 2 && !me.unoSafe ? 'ready' : ''}`} onClick={() => send('uno')}>
+            <button className={`uno-btn ${canCallLast(hand) && !me.unoSafe ? 'ready' : ''}`} onClick={() => send('uno')}>
               LAST!
             </button>
           </div>

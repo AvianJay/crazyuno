@@ -9,6 +9,8 @@ export interface EffectContext {
   card: Card;
   rng: () => number;
   log(msg: string): void;
+  /** 讓某個人抽 n 張（超過手牌上限一樣會爆牌） */
+  draw(playerIndex: number, n: number): void;
   /** 出完牌後往前走幾個人（預設 1；跳過 = 2） */
   advance: number;
   /** 直接指定下一個輪到誰（player index），會蓋過 advance */
@@ -32,5 +34,7 @@ export interface CardDef {
   count: number;
   /** 抽牌疊加中（pendingDraw > 0）可以出這張來接 */
   stackable?: boolean;
+  /** 疊加的大小（+2、+4、+99）：「越疊越大」只能往上疊。沒有的（×2、鏡子、骰子）不受限 */
+  rank?: number;
   onPlay?(ctx: EffectContext): void;
 }

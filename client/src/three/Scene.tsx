@@ -1,4 +1,4 @@
-import { COLORS, type Card, type Color, type GameView, type RoomView } from '@crazyuno/shared';
+import { COLOR_NAME, COLORS, type Card, type Color, type GameView, type RoomView } from '@crazyuno/shared';
 import { Environment, Html, Lightformer, PerformanceMonitor, Sparkles } from '@react-three/drei';
 import { useFrame, useThree } from '@react-three/fiber';
 import { Bloom, ChromaticAberration, EffectComposer, ToneMapping, Vignette } from '@react-three/postprocessing';
@@ -6,7 +6,8 @@ import { ToneMappingMode, type ChromaticAberrationEffect } from 'postprocessing'
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactElement, type RefObject } from 'react';
 import * as THREE from 'three';
 import { Avatar } from '../components/Avatar';
-import { DeckIcon, MicIcon, RobotIcon, SirenIcon, SkullIcon, SwapIcon } from '../components/icons';
+import { CheckIcon, DeckIcon, MicIcon, RobotIcon, SearchIcon, SirenIcon, SkullIcon, SwapIcon } from '../components/icons';
+import { faceImage } from '../cardFace';
 import { formatCount } from '../count';
 import { useIsSpeaking } from '../useDiscord';
 import { backTexture, CARD_H, CARD_W, COLOR_HEX, feltTexture, glowTexture } from './cardArt';
@@ -51,6 +52,8 @@ interface Props {
   onMiss(): void;
   onDraw(): void;
   onCatch(targetId: string): void;
+  /** 質疑上一張 +4（按鈕在出 +4 的人的名牌上） */
+  onChallenge(): void;
   /** 3D 裡的 HTML 標籤掛在這個 div 上 */
   labels: RefObject<HTMLElement>;
   quality: Quality;
@@ -70,6 +73,7 @@ export function Scene(props: Props) {
   const myTurn = game.phase === 'playing' && game.turnId === view.you;
   // 名牌要讓開上方中間的「輪到誰」膠囊（見 styles.css 的 .turn-pill、.game-clock），有整局倒數就再往下
   const hudTop = view.gameMsLeft !== null && game.phase === 'playing' ? 92 : 60;
+  const reveal = useReveal(props.events);
   // 第一格畫面之前就要知道鏡頭在哪，新牌才知道從哪裡飛出來
   if (!rig.ready) placeRig(aspect);
 
@@ -128,6 +132,9 @@ export function Scene(props: Props) {
               onCatch={() => props.onCatch(p.id)}
               canTarget={props.targeting && !p.out}
               onTarget={() => props.onPickTarget(p.id)}
+              challenge={myTurn && !props.pendingCard && game.challenge?.fromId === p.id ? game.challenge.color : null}
+              onChallenge={props.onChallenge}
+              reveal={reveal?.target === p.id ? reveal : null}
             />
           );
         })}
@@ -168,6 +175,21 @@ export function Scene(props: Props) {
       ) : null}
     </>
   );
+}
+
+type ChallengeEvent = Extract<GameEvent, { t: 'challenge' }>;
+
+/** 質疑完在被質疑的人名牌上亮幾秒：抓包就攤出證據，清白就打勾 */
+function useReveal(events: GameEvent[]): ChallengeEvent | null {
+  const [reveal, setReveal] = useState<ChallengeEvent | null>(null);
+  useEffect(() => {
+    const e = events.find((x): x is ChallengeEvent => x.t === 'challenge');
+    if (!e) return;
+    setReveal(e);
+    // 不在 cleanup 清掉計時器：每個新畫面都會重跑這個 effect，清掉的話會一直亮著
+    setTimeout(() => setReveal((r) => (r === e ? null : r)), 4500);
+  }, [events]);
+  return reveal;
 }
 
 /** 桌子中間累積的 +N：越多字越大，但不能比畫面還寬（手機直的放不下「+567.1億」這種） */
@@ -454,15 +476,19 @@ function Cards({
       discard.current.push({ card: game.topCard, rz: jitter() });
       spawns.current.set(game.topCard.id, fromDeck());
     }
+    // 別人出的牌從他的座位蓋著飛出來；自己的牌本來就在手上，同一個 key 會直接從手上飛過去
+    const toDiscard = (card: Card, by: string, delay = 0) => {
+      if (discard.current.some((d) => d.card.id === card.id)) return;
+      if (!known.current.has(card.id)) spawns.current.set(card.id, pose(seatPoint(seats, by, 0.9), [FACE_DOWN, 0, 0], 0.7));
+      delays.current.set(card.id, delay);
+      discard.current.push({ card, rz: jitter() });
+      if (discard.current.length > 16) discard.current.shift();
+    };
     let giver: string | null = null;
     for (const e of events) {
-      if (e.t === 'play' && !discard.current.some((d) => d.card.id === e.card.id)) {
-        if (!known.current.has(e.card.id)) {
-          spawns.current.set(e.card.id, pose(seatPoint(seats, e.by, 0.9), [FACE_DOWN, 0, 0], 0.7));
-        }
-        discard.current.push({ card: e.card, rz: jitter() });
-        if (discard.current.length > 16) discard.current.shift();
-      }
+      // 清倉：同顏色的牌一張接一張甩出去，壓在清倉那張下面
+      if (e.t === 'sweep') e.cards.forEach((c, i) => toDiscard(c, e.by, 0.05 + i * 0.07));
+      if (e.t === 'play') toDiscard(e.card, e.by);
       if (e.t === 'swap') giver = e.moves.find(([, to]) => to === view.you)?.[0] ?? null;
     }
     // 新拿到的牌：一般從抽牌堆飛過來，換手牌的話從原本拿著的人那裡飛過來
@@ -494,6 +520,7 @@ function Cards({
         key={d.card.id}
         card={d.card}
         spawn={spawns.current.get(d.card.id) ?? target}
+        delay={delays.current.get(d.card.id) ?? 0}
         speed={i === n - 1 ? 7 : 10}
         target={(out) => {
           out.pos.copy(target.pos);
@@ -682,6 +709,9 @@ function Seat({
   onCatch,
   canTarget,
   onTarget,
+  challenge,
+  onChallenge,
+  reveal,
   labels,
   hudTop,
   offline,
@@ -703,6 +733,11 @@ function Seat({
   /** 可以選他換手牌 */
   canTarget: boolean;
   onTarget(): void;
+  /** 他剛出了 +4、輪到你：可以質疑他其實有這個顏色（null = 不能質疑） */
+  challenge: Color | null;
+  onChallenge(): void;
+  /** 剛被質疑完的結果 */
+  reveal: ChallengeEvent | null;
 }) {
   const ring = useRef<THREE.MeshBasicMaterial>(null!);
   const fan = useRef<THREE.Group>(null!);
@@ -783,6 +818,32 @@ function Seat({
             <button className="swap-btn" onClick={onTarget} aria-label={`跟 ${player.name} 換手牌`}>
               <SwapIcon />
             </button>
+          )}
+          {challenge && (
+            <button
+              className="challenge-btn"
+              onClick={onChallenge}
+              aria-label={`質疑 ${player.name}：他其實有${COLOR_NAME[challenge]}牌？`}
+              title={`他其實有${COLOR_NAME[challenge]}牌？`}
+              style={{ '--c': COLOR_HEX[challenge] } as CSSProperties}
+            >
+              <SearchIcon />
+              <span className="challenge-diamond">?</span>
+            </button>
+          )}
+          {reveal && (
+            <div className={`reveal ${reveal.guilty ? 'guilty' : 'clean'}`} style={{ '--c': COLOR_HEX[reveal.color] } as CSSProperties}>
+              {reveal.guilty ? (
+                <>
+                  {reveal.cards.slice(0, 5).map((c, i) => (
+                    <img key={c.id} src={faceImage(c)} alt="" style={{ '--i': i } as CSSProperties} />
+                  ))}
+                  {reveal.cards.length > 5 && <span className="reveal-more">+{reveal.cards.length - 5}</span>}
+                </>
+              ) : (
+                <CheckIcon />
+              )}
+            </div>
           )}
         </div>
       </Html>

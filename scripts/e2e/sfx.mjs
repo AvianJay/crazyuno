@@ -5,7 +5,7 @@
 import { launch, sleep } from './cdp.mjs';
 
 const BASE = process.env.BASE ?? 'http://localhost:5173';
-const edge = await launch({ port: 9334 });
+const edge = await launch();
 const page = await edge.newPage({ width: 800, height: 600, label: 'sfx' });
 try {
   await page.goto(`${BASE}/?room=sfx-${Date.now()}&name=sfx`);

@@ -2,10 +2,12 @@
  * 開幾個機器人連進房間互打一整局，用來測試伺服器。
  *   npx tsx scripts/bots.mts [人數] [房間]
  * 也可以自己開瀏覽器 http://localhost:5173/?room=bots 跟它們一起玩（機器人只會在輪到自己時出牌，不會開局，要你當房主或讓 bot0 開）
- * 環境變數 SEVEN_ZERO=1 開 0/7 規則、GAME_MINUTES=1 整局限時一分鐘（bot0 當房主開局時才有用）
+ * 環境變數（bot0 當房主開局時才有用）：
+ *   SEVEN_ZERO=1 開 0/7 規則、GAME_MINUTES=1 整局限時一分鐘、CRAZY=1 怪牌全開
+ *   RULES=challenge,stackUp,cap99,-stacking 開關規則（前面加 - 是關掉）
  */
 import { Client, type Room } from '@colyseus/sdk';
-import { getCardDef, isSwapSeven, type RoomView } from '@crazyuno/shared';
+import { CRAZY_KINDS, getCardDef, isSwapSeven, type RoomView } from '@crazyuno/shared';
 
 const count = Number(process.argv[2] ?? 3);
 const roomKey = process.argv[3] ?? `bots-${Date.now()}`;
@@ -28,10 +30,13 @@ async function bot(i: number): Promise<void> {
     const g = v.game;
     if (!g) {
       if (i === 0 && v.you === v.hostId && v.seats.length >= count && !finished) {
+        const rules = (process.env.RULES ?? '').split(',').filter(Boolean);
         room.send('settings', {
           turnSeconds: 0,
           sevenZero: process.env.SEVEN_ZERO === '1',
           gameMinutes: Number(process.env.GAME_MINUTES ?? 0),
+          ...(process.env.CRAZY === '1' ? { crazyCards: CRAZY_KINDS } : {}),
+          ...Object.fromEntries(rules.map((r) => (r.startsWith('-') ? [r.slice(1), false] : [r, true]))),
         });
         room.send('start');
       }
@@ -80,6 +85,11 @@ async function bot(i: number): Promise<void> {
     const g = v.game!;
     const hand = g.hand ?? [];
     if (hand.length <= 2 && Math.random() < 0.7) room.send('uno');
+    // 被 +4：一半的機會質疑
+    if (g.challenge && Math.random() < 0.5) {
+      room.send('challenge');
+      return;
+    }
     const card = hand.find((c) => g.playable.includes(c.id));
     if (card) {
       const color = getCardDef(card.kind).wild ? COLORS[Math.floor(Math.random() * 4)] : undefined;

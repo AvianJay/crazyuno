@@ -1,6 +1,6 @@
 /**
- * 自動打一整局：桌機房主 + 手機玩家 + 1 個機器人，全部怪牌打開，也開 0/7 規則和整局限時。
- * 途中截圖、檢查瀏覽器 console 有沒有錯誤，並用真的滑鼠點一次 3D 手牌。
+ * 自動打一整局：桌機房主 + 手機玩家 + 1 個機器人，全部怪牌打開，也開 0/7 規則、+4 質疑和整局限時。
+ * 途中截圖、檢查瀏覽器 console 有沒有錯誤，並用真的滑鼠點一次 3D 手牌（碰到的話也點一次質疑）。
  * 要先開著 npm run dev。
  *
  *   node scripts/e2e/play.mjs          打一整局
@@ -58,11 +58,12 @@ try {
   // 不限時（軟體算圖很慢，不然一直時間到）；連點 8 下「−」，順便測連點不會被舊畫面蓋掉
   await host.eval(`(() => { const b = document.querySelectorAll('.stepper')[2].querySelector('.step-btn'); for (let i = 0; i < 8; i++) b.click(); })()`);
   await host.waitFor(`!!document.querySelectorAll('.stepper')[2].querySelector('.stepper-value svg')`, 8000);
-  await host.waitFor(`document.querySelectorAll('.crazy-card.on').length === 5`, 8000);
-  // 0/7 規則、整局限時 5 分鐘
-  await host.click('.rule-card');
+  await host.waitFor(`document.querySelectorAll('.crazy-card.on').length === document.querySelectorAll('.crazy-card').length`, 8000);
+  // 0/7 規則、+4 質疑、整局限時 5 分鐘
+  await host.click('[data-rule=sevenZero]');
+  await host.click('[data-rule=challenge]');
   await host.eval(`document.querySelectorAll('.stepper')[3].querySelectorAll('.step-btn')[1].click()`);
-  await host.waitFor(`!!document.querySelector('.rule-card.on') && document.querySelectorAll('.stepper')[3].innerText.includes('5')`, 8000);
+  await host.waitFor(`!!document.querySelector('[data-rule=sevenZero].on') && !!document.querySelector('[data-rule=challenge].on') && document.querySelectorAll('.stepper')[3].innerText.includes('5')`, 8000);
   await sleep(1200);
   await shot(host, 'lobby');
   await shot(phone, 'lobby-mobile');
@@ -141,6 +142,8 @@ async function playGame(host, phone) {
         unoSafe: g.players.find(p => p.id === v.you)?.unoSafe,
         out: g.players.find(p => p.id === v.you)?.out,
         catchBtn: !!document.querySelector('.catch-btn'),
+        challenge: !!g.challenge && !!document.querySelector('.challenge-btn'),
+        challengeSeq: g.challengeResult?.seq ?? 0,
         toast: document.querySelector('.toast')?.innerText ?? null,
       };
     })()`);
@@ -208,10 +211,26 @@ async function playGame(host, phone) {
     return `7：點換牌按鈕換了手牌（${before.hand.length - 1} 張 → ${after.hand.length} 張）`;
   };
 
+  // +4 質疑：出 +4 的人名牌上冒出放大鏡，真的用滑鼠點下去，等結果出來（抓包或清白）
+  const tryChallenge = async (page, before) => {
+    await sleep(1200);
+    await shot(page, 'challenge');
+    const r = await page.eval(`(() => { const b = document.querySelector('.challenge-btn').getBoundingClientRect(); return { x: b.x + b.width / 2, y: b.y + b.height / 2 }; })()`);
+    for (const type of ['mouseMoved', 'mousePressed', 'mouseReleased']) {
+      await page.send('Input.dispatchMouseEvent', { type, x: r.x, y: r.y, button: 'left', clickCount: 1 });
+    }
+    await page.waitFor(`(window.__uno.view.game.challengeResult?.seq ?? 0) > ${before}`, 8000);
+    await sleep(700);
+    await shot(page, 'challenged');
+    const guilty = await page.eval(`window.__uno.view.game.challengeResult.guilty`);
+    return `+4 質疑：點了放大鏡，${guilty ? '抓包' : '對方清白'}，名牌上${(await page.eval(`!!document.querySelector('.reveal')`)) ? '有' : '沒有'}亮出結果`;
+  };
+
   const toasts = new Set();
   let realClickDone = false;
   let wildDone = false;
   let sevenDone = false;
+  let challengeDone = false;
   let moves = 0;
   let ended = false;
   const deadline = Date.now() + 200_000;
@@ -238,6 +257,12 @@ async function playGame(host, phone) {
       if (s.out || !s.myTurn) continue;
 
       if (s.hand.length <= 2 && !s.unoSafe) await page.eval(`window.__uno.send('uno')`);
+      if (!challengeDone && s.challenge) {
+        challengeDone = true;
+        console.log(`${name}：`, await tryChallenge(page, s.challengeSeq));
+        moves++;
+        continue;
+      }
       const wildCard = s.hand.find((c) => c.wild && s.playable.includes(c.id));
       const sevenCard = s.hand.find((c) => c.seven && s.playable.includes(c.id));
       if (!sevenDone && sevenCard && s.others.length > 1 && s.hand.length > 1) {
@@ -264,6 +289,6 @@ async function playGame(host, phone) {
     }
     await sleep(250);
   }
-  console.log(`打完了嗎：${ended}，動作數：${moves}，有測到 7 換牌：${sevenDone}`);
+  console.log(`打完了嗎：${ended}，動作數：${moves}，有測到 7 換牌：${sevenDone}，有測到 +4 質疑：${challengeDone}`);
   console.log('伺服器錯誤訊息：', [...toasts]);
 }

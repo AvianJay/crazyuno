@@ -284,6 +284,32 @@ export function tornado() {
   tone({ freq: 60, dur, vol: 0.3, attack: 0.3, vibrato: { rate: 6, depth: 15 } });
 }
 
+/** 見者有份：拆禮物的叮叮噹噹，再一陣發牌聲 */
+export function gift() {
+  [784, 988, 1175, 1568].forEach((f, i) => tone({ type: 'triangle', freq: f, dur: 0.3, vol: 0.14, at: i * 0.07 }));
+  tone({ freq: 3136, dur: 0.5, vol: 0.04, at: 0.28 });
+  for (let i = 0; i < 8; i++) flick(0.35 + i * 0.045);
+}
+
+/** 清倉：一疊牌啪啪啪甩出去 */
+export function sweep(n = 3) {
+  const shown = Math.min(n + 1, 12);
+  for (let i = 0; i < shown; i++) {
+    noise({ type: 'bandpass', freq: 1400 + i * 120, q: 0.8, dur: 0.07, vol: 0.45, at: i * 0.055 });
+    flick(i * 0.055 + 0.02);
+  }
+  whoosh(0.35 + shown * 0.05);
+  tone({ freq: 140, to: 45, dur: 0.2, vol: 0.5, at: shown * 0.055 });
+}
+
+/** 質疑：法槌敲兩下 */
+export function gavel() {
+  for (const at of [0, 0.2]) {
+    tone({ freq: 200, to: 70, dur: 0.14, vol: 0.7, at });
+    noise({ type: 'bandpass', freq: 1100, q: 2, dur: 0.06, vol: 0.5, at });
+  }
+}
+
 /** UNO! */
 export function unoShout() {
   for (const [f, at] of [

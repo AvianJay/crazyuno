@@ -1,4 +1,5 @@
-import { activeCount, addPendingDraw, passHands, reverseDirection } from '../state';
+import { activeCount, addPendingDraw, nextActive, passHands, reverseDirection } from '../state';
+import type { Card } from '../types';
 import type { CardDef } from './def';
 
 /**
@@ -15,6 +16,7 @@ export const crazyCards: CardDef[] = [
     wild: true,
     count: 1,
     stackable: true,
+    rank: 99,
     onPlay(ctx) {
       addPendingDraw(ctx.state, 99, ctx.playerIndex);
       ctx.log(`☠️ ${ctx.player.name} 丟出了 +99！`);
@@ -87,6 +89,44 @@ export const crazyCards: CardDef[] = [
     onPlay(ctx) {
       passHands(ctx.state);
       ctx.log('🌀 大風吹！大家的手牌都換人了');
+    },
+  },
+  {
+    kind: 'drawAll',
+    name: '見者有份',
+    label: '+2',
+    description: '除了你以外，每個人都抽 2 張。',
+    crazy: true,
+    wild: false,
+    count: 1,
+    onPlay(ctx) {
+      const { state } = ctx;
+      ctx.log(`🎁 見者有份！${ctx.player.name} 請大家各抽 2 張`);
+      // 從下一家開始照順序抽；其他人都被抽爆了（遊戲結束）就停
+      const others: number[] = [];
+      for (let i = nextActive(state, ctx.playerIndex); i !== ctx.playerIndex; i = nextActive(state, i)) others.push(i);
+      for (const i of others) if (state.phase === 'playing') ctx.draw(i, 2);
+    },
+  },
+  {
+    kind: 'discardAll',
+    name: '清倉',
+    label: '🧹',
+    description: '手上跟這張同顏色的牌一口氣全部丟掉（一起丟掉的功能牌不會發動）。',
+    crazy: true,
+    wild: false,
+    count: 1,
+    onPlay(ctx) {
+      const { state, player, card } = ctx;
+      const cards: Card[] = [];
+      for (let i = player.hand.length - 1; i >= 0; i--) {
+        if (player.hand[i].color === card.color) cards.unshift(...player.hand.splice(i, 1));
+      }
+      if (!cards.length) return;
+      // 清倉這張留在最上面，下一家照它的顏色接
+      state.discardPile.splice(-1, 0, ...cards);
+      state.bulkDiscard = { seq: (state.bulkDiscard?.seq ?? 0) + 1, by: player.id, cards };
+      ctx.log(`🧹 ${player.name} 清倉！一口氣丟掉 ${cards.length} 張`);
     },
   },
 ];

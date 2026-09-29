@@ -57,6 +57,7 @@ export const standardCards: CardDef[] = [
     wild: false,
     count: 2,
     stackable: true,
+    rank: 2,
     onPlay(ctx) {
       addPendingDraw(ctx.state, 2, ctx.playerIndex);
     },
@@ -79,6 +80,7 @@ export const standardCards: CardDef[] = [
     wild: true,
     count: 4,
     stackable: true,
+    rank: 4,
     onPlay(ctx) {
       addPendingDraw(ctx.state, 4, ctx.playerIndex);
     },

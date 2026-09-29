@@ -22,6 +22,10 @@ export const DEFAULT_SETTINGS: GameSettings = {
   turnSeconds: 30,
   gameMinutes: 0,
   sevenZero: false,
+  stacking: true,
+  stackUp: false,
+  cap99: false,
+  challenge: false,
 };
 
 type Rng = () => number;
@@ -49,9 +53,10 @@ export function buildDeck(crazyCards: CardKind[], nextId: () => string): Card[] 
   return deck;
 }
 
+export const COLOR_NAME: Record<Color, string> = { red: '紅', yellow: '黃', green: '綠', blue: '藍' };
+
 export function cardName(card: Card): string {
-  const colorName = { red: '紅', yellow: '黃', green: '綠', blue: '藍' };
-  const color = card.color ? colorName[card.color] : '';
+  const color = card.color ? COLOR_NAME[card.color] : '';
   if (card.kind === 'number') return `${color}${card.value}`;
   return `${color}${getCardDef(card.kind).name}`;
 }
@@ -72,6 +77,10 @@ export function createGame(
     direction: 1,
     pendingDraw: 0,
     pendingFrom: null,
+    stackLevel: 0,
+    lastWild4: null,
+    challengeResult: null,
+    bulkDiscard: null,
     hasDrawn: false,
     handSwap: null,
     winnerId: null,
@@ -120,13 +129,31 @@ export function topCard(state: GameState): Card {
 }
 
 export function canPlay(state: GameState, card: Card): boolean {
-  const def = getCardDef(card.kind);
-  if (state.pendingDraw > 0) return !!def.stackable;
-  if (def.wild) return true;
+  if (state.pendingDraw > 0) return canStack(state, card.kind);
+  if (getCardDef(card.kind).wild) return true;
   if (card.color === state.currentColor) return true;
   const top = topCard(state);
   if (card.kind !== top.kind) return false;
   return card.kind !== 'number' || card.value === top.value;
+}
+
+/** 抽牌疊加中能不能出這張來接 */
+function canStack(state: GameState, kind: CardKind): boolean {
+  const def = getCardDef(kind);
+  if (!def.stackable) return false;
+  // 鏡子不是疊上去，是把整疊彈回去：疊加關掉、+99 封頂都擋不住它
+  if (kind === 'mirror') return true;
+  const s = state.settings;
+  if (!s.stacking) return false;
+  if (s.cap99 && state.stackLevel >= 99) return false;
+  // 越疊越大：+2、+4、+99 只能往上疊；×2、骰子沒有大小，不受限
+  return !(s.stackUp && def.rank !== undefined && def.rank < state.stackLevel);
+}
+
+/** 喊 LAST! 的時機：剩兩張以下，或手上的清倉一出就剩一張以下 */
+export function canCallLast(hand: Pick<Card, 'kind' | 'color'>[]): boolean {
+  if (hand.length <= 2) return true;
+  return hand.some((c) => c.kind === 'discardAll' && hand.length - hand.filter((d) => d.color === c.color).length <= 1);
 }
 
 /** 0/7 規則下的 7：出的人要選一個人交換手牌 */
@@ -182,14 +209,14 @@ function eliminate(state: GameState, index: number, msg: string): void {
   state.drawPile.unshift(...player.hand);
   player.hand = [];
   if (state.pendingFrom === index) state.pendingFrom = null;
+  if (state.lastWild4?.from === index) state.lastWild4 = null;
   pushLog(state, msg);
   if (activeCount(state) <= 1) {
     const winner = state.players.find((p) => !p.out);
     endGame(state, winner?.id ?? null);
   } else if (state.turn === index) {
     // 輪到他的時候出局：累積的抽牌作廢，換下一個人
-    state.pendingDraw = 0;
-    state.pendingFrom = null;
+    clearPending(state);
     setTurn(state, nextActive(state, index));
   }
 }
@@ -199,6 +226,14 @@ function endGame(state: GameState, winnerId: string | null): void {
   state.winnerId = winnerId;
   const winner = state.players.find((p) => p.id === winnerId);
   pushLog(state, winner ? `🏆 ${winner.name} 贏了！` : '遊戲結束');
+}
+
+/** 這一疊抽牌結束了（被吃掉、質疑完、輪到的人出局） */
+function clearPending(state: GameState): void {
+  state.pendingDraw = 0;
+  state.pendingFrom = null;
+  state.stackLevel = 0;
+  state.lastWild4 = null;
 }
 
 function setTurn(state: GameState, index: number): void {
@@ -230,9 +265,12 @@ export function playCard(state: GameState, playerId: string, msg: PlayMsg, rng: 
   if (def.wild && !(msg.color && COLORS.includes(msg.color))) throw new GameError('請選一個顏色');
   const target = swapTarget(state, index, card, msg.targetId);
 
+  const colorBefore = state.currentColor;
   player.hand.splice(cardIndex, 1);
   state.discardPile.push(card);
   state.currentColor = def.wild ? msg.color! : card.color!;
+  // 有人接了（或出了別的牌），上一張 +4 就不能再質疑
+  state.lastWild4 = null;
   pushLog(state, `${player.name} 出了 ${cardName(card)}`);
 
   if (player.hand.length === 0) {
@@ -247,10 +285,26 @@ export function playCard(state: GameState, playerId: string, msg: PlayMsg, rng: 
     card,
     rng,
     log: (m) => pushLog(state, m),
+    draw: (i, n) => {
+      drawCards(state, i, n, rng);
+    },
     advance: 1,
     target,
   };
   def.onPlay?.(ctx);
+  // 見者有份可能把其他人全部抽爆
+  if (state.phase !== 'playing') return;
+  // 清倉一口氣丟光也算出完
+  if (player.hand.length === 0) {
+    endGame(state, player.id);
+    return;
+  }
+  // LAST! 只保護剩一張的人：拿著清倉提早喊、最後卻沒出到剩一張，就不算數
+  if (player.hand.length > 1) player.unoSafe = false;
+  if (state.pendingDraw > 0 && def.rank) state.stackLevel = Math.max(state.stackLevel, def.rank);
+  if (card.kind === 'wild4' && state.settings.challenge) {
+    state.lastWild4 = { from: index, color: colorBefore, cards: player.hand.filter((c) => c.color === colorBefore) };
+  }
   setTurn(state, ctx.nextTurn ?? nextActive(state, index, ctx.advance));
 }
 
@@ -260,8 +314,7 @@ export function drawAction(state: GameState, playerId: string, rng: Rng = Math.r
 
   if (state.pendingDraw > 0) {
     const n = state.pendingDraw;
-    state.pendingDraw = 0;
-    state.pendingFrom = null;
+    clearPending(state);
     pushLog(state, `${player.name} 吃下了 ${n} 張牌`);
     drawCards(state, index, n, rng);
     if (state.phase === 'playing' && !player.out) setTurn(state, nextActive(state, index));
@@ -288,10 +341,51 @@ export function passTurn(state: GameState, playerId: string): void {
 export function sayUno(state: GameState, playerId: string): void {
   const player = state.players.find((p) => p.id === playerId);
   if (!player || player.out || state.phase !== 'playing') throw new GameError('現在不能喊');
-  if (player.hand.length > 2) throw new GameError('剩兩張以下才能喊 LAST!');
+  if (!canCallLast(player.hand)) throw new GameError('剩兩張以下才能喊 LAST!');
   if (player.unoSafe) return;
   player.unoSafe = true;
   pushLog(state, `📢 ${player.name}：LAST!`);
+}
+
+/** 輪到的人能不能質疑上一張 +4 */
+function canChallenge(state: GameState): boolean {
+  const check = state.lastWild4;
+  return state.phase === 'playing' && !!check && state.pendingDraw > 0 && check.from !== state.turn && !state.players[check.from].out;
+}
+
+/**
+ * 質疑上一張 +4：出的人其實有原本的顏色嗎？（疊加中也可以，手上有 + 也可以）
+ * 猜對 → 他吃下整疊，你照常出牌；猜錯 → 你吃下整疊再多 2 張，換下一個人。
+ */
+export function challengeWild4(state: GameState, playerId: string, rng: Rng = Math.random): void {
+  const index = requireTurn(state, playerId);
+  const check = state.lastWild4;
+  if (!check || !canChallenge(state)) throw new GameError('現在沒有 +4 可以質疑');
+  const challenger = state.players[index];
+  const suspect = state.players[check.from];
+  const n = state.pendingDraw;
+  const guilty = check.cards.length > 0;
+  const color = COLOR_NAME[check.color];
+  clearPending(state);
+  state.challengeResult = {
+    seq: (state.challengeResult?.seq ?? 0) + 1,
+    by: challenger.id,
+    target: suspect.id,
+    color: check.color,
+    guilty,
+    cards: check.cards,
+  };
+  pushLog(state, `⚖️ ${challenger.name} 質疑 ${suspect.name} 的 +4！`);
+  if (guilty) {
+    pushLog(state, `🎯 抓到了！${suspect.name} 明明有${color}牌，自己吃下 ${n} 張`);
+    drawCards(state, check.from, n, rng);
+    // 猜對的人照常出牌，重新計時
+    if (state.phase === 'playing') setTurn(state, index);
+  } else {
+    pushLog(state, `❌ 猜錯了！${suspect.name} 真的沒有${color}牌，${challenger.name} 吃下 ${n + 2} 張`);
+    drawCards(state, index, n + 2, rng);
+    if (state.phase === 'playing' && !challenger.out) setTurn(state, nextActive(state, index));
+  }
 }
 
 export function catchUno(state: GameState, catcherId: string, targetId: string, rng: Rng = Math.random): void {
@@ -353,6 +447,7 @@ export function botMove(state: GameState, rng: Rng = Math.random): void {
   const options = player.hand.filter((c) => canPlay(state, c));
   if (options.length === 0) {
     if (state.hasDrawn && state.pendingDraw === 0) passTurn(state, player.id);
+    else if (shouldChallenge(state)) challengeWild4(state, player.id, rng);
     else drawAction(state, player.id, rng);
     return;
   }
@@ -361,10 +456,14 @@ export function botMove(state: GameState, rng: Rng = Math.random): void {
   const cost = (c: Card) => {
     if (c.kind === 'draw99') return 1000;
     if (getCardDef(c.kind).wild) return 500;
+    // 清倉：同顏色越多越划算
+    if (c.kind === 'discardAll') return -counts[c.color!] * 2;
     return -counts[c.color!];
   };
   const card = options.reduce((best, c) => (cost(c) < cost(best) ? c : best));
-  if (player.hand.length === 2 && !player.unoSafe) sayUno(state, player.id);
+  // 出完剩一張就先喊（清倉一次會少好幾張）
+  const left = player.hand.length - (card.kind === 'discardAll' ? counts[card.color!] : 1);
+  if (left === 1 && !player.unoSafe) sayUno(state, player.id);
   const color = getCardDef(card.kind).wild ? bestColor(player.hand.filter((c) => c !== card), rng) : undefined;
   // 出 7 換牌就找手牌最少的人換
   let targetId: string | undefined;
@@ -373,6 +472,17 @@ export function botMove(state: GameState, rng: Rng = Math.random): void {
     targetId = others.reduce((a, b) => (b.hand.length < a.hand.length ? b : a)).id;
   }
   playCard(state, player.id, { cardId: card.id, color, targetId }, rng);
+}
+
+/**
+ * 機器人要不要質疑 +4：對方剩的牌越多，越可能其實有原本的顏色（當作一半的人會老實出）；
+ * 疊得越多，猜錯多吃的 2 張相對越不痛。期望值划算才質疑。
+ */
+function shouldChallenge(state: GameState): boolean {
+  if (!canChallenge(state)) return false;
+  const left = state.players[state.lastWild4!.from].hand.length;
+  const guilty = 0.5 * (1 - 0.77 ** left);
+  return guilty > 2 / (state.pendingDraw + 2);
 }
 
 function colorCounts(hand: Card[]): Record<Color, number> {
@@ -413,6 +523,10 @@ export function getView(state: GameState, viewerId: string): GameView {
     hasDrawn: myTurn && state.hasDrawn,
     handSwap: state.handSwap,
     sevenZero: state.settings.sevenZero,
+    // 只給誰出的、原本的顏色；他到底有沒有唬爛（lastWild4.cards）前端不能知道
+    challenge: canChallenge(state) ? { fromId: state.players[state.lastWild4!.from].id, color: state.lastWild4!.color } : null,
+    challengeResult: state.challengeResult,
+    bulkDiscard: state.bulkDiscard,
     drawPileCount: state.drawPile.length,
     winnerId: state.winnerId,
     log: state.log,

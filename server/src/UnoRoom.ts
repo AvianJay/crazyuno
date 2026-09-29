@@ -3,6 +3,7 @@ import {
   autoMove,
   botMove,
   catchUno,
+  challengeWild4,
   createGame,
   CRAZY_KINDS,
   DEFAULT_SETTINGS,
@@ -12,6 +13,7 @@ import {
   MAX_PLAYERS,
   passTurn,
   playCard,
+  RULE_KEYS,
   sayUno,
   timeUp,
   type CardKind,
@@ -20,6 +22,7 @@ import {
   type GameState,
   type PlayMsg,
   type RoomView,
+  type RuleKey,
   type Seat,
 } from '@crazyuno/shared';
 import { verifyDiscordUser } from './discordAuth';
@@ -113,7 +116,7 @@ export class UnoRoom extends Room {
         if (patch.startingHand !== undefined) s.startingHand = clamp(patch.startingHand, 1, 20, s.startingHand);
         if (patch.turnSeconds !== undefined) s.turnSeconds = clamp(patch.turnSeconds, 0, 120, s.turnSeconds);
         if (patch.gameMinutes !== undefined) s.gameMinutes = clamp(patch.gameMinutes, 0, 60, s.gameMinutes);
-        if (typeof patch.sevenZero === 'boolean') s.sevenZero = patch.sevenZero;
+        for (const key of RULE_KEYS) if (typeof patch[key] === 'boolean') s[key] = patch[key];
       }),
 
     // 下面三個是「相對」的改法：連點好幾下時伺服器照順序改，不會被還沒更新的畫面蓋掉
@@ -126,10 +129,10 @@ export class UnoRoom extends Room {
         s.crazyCards = CRAZY_KINDS.filter((k) => (k === kind ? !on : s.crazyCards.includes(k)));
       }),
 
-    toggleSevenZero: (client: Client) =>
+    toggleRule: (client: Client, key: RuleKey) =>
       this.handle(client, () => {
         this.requireHost(client);
-        this.settings.sevenZero = !this.settings.sevenZero;
+        if (RULE_KEYS.includes(key)) this.settings[key] = !this.settings[key];
       }),
 
     adjust: (client: Client, msg: { key: 'startingHand' | 'handLimit' | 'turnSeconds' | 'gameMinutes'; delta: number }) =>
@@ -165,6 +168,7 @@ export class UnoRoom extends Room {
     draw: (client: Client) => this.handle(client, (id) => drawAction(this.requireGame(), id)),
     pass: (client: Client) => this.handle(client, (id) => passTurn(this.requireGame(), id)),
     uno: (client: Client) => this.handle(client, (id) => sayUno(this.requireGame(), id)),
+    challenge: (client: Client) => this.handle(client, (id) => challengeWild4(this.requireGame(), id)),
     catch: (client: Client, msg: CatchMsg) =>
       this.handle(client, (id) => catchUno(this.requireGame(), id, String(msg?.targetId))),
   };

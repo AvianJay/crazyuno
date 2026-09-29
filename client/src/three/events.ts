@@ -1,4 +1,4 @@
-import { getCardDef, type Card, type Color, type RoomView } from '@crazyuno/shared';
+import { getCardDef, type Card, type ChallengeResult, type Color, type RoomView } from '@crazyuno/shared';
 
 /** 比對前後兩次畫面資料，推算出剛剛發生了什麼事，用來放動畫和音效 */
 export type GameEvent =
@@ -12,6 +12,10 @@ export type GameEvent =
   | { t: 'swap'; card: Card; moves: [from: string, to: string][] }
   | { t: 'mirror' }
   | { t: 'dice'; roll: number }
+  /** 清倉：跟著一起丟到棄牌堆的牌（壓在清倉那張下面） */
+  | { t: 'sweep'; by: string; cards: Card[] }
+  /** +4 質疑的結果：guilty = 猜對了，cards 是亮出來的證據 */
+  | ({ t: 'challenge' } & ChallengeResult)
   | { t: 'out'; id: string }
   | { t: 'uno'; id: string }
   | { t: 'caught' }
@@ -40,7 +44,12 @@ export function diffViews(prev: RoomView | null, next: RoomView): GameEvent[] {
   const events: GameEvent[] = [];
   const played = b.topCard.id !== a.topCard.id;
   const swap = b.handSwap && b.handSwap.seq !== a.handSwap?.seq ? b.handSwap : null;
+  const sweep = b.bulkDiscard && b.bulkDiscard.seq !== a.bulkDiscard?.seq ? b.bulkDiscard : null;
+  const challenge = b.challengeResult && b.challengeResult.seq !== a.challengeResult?.seq ? b.challengeResult : null;
 
+  // 清倉丟掉的牌要先放進棄牌堆，清倉那張才會疊在它們上面
+  if (sweep) events.push({ t: 'sweep', by: sweep.by, cards: sweep.cards });
+  if (challenge) events.push({ t: 'challenge', ...challenge });
   if (played) {
     // 只有輪到的人能出牌，所以出牌的是上一個畫面的 turnId
     events.push({ t: 'play', by: a.turnId, card: b.topCard });

@@ -279,6 +279,35 @@ export const SwapIcon = (p: P) => (
   </Svg>
 );
 
+/** 質疑 +4：放大鏡 */
+export const SearchIcon = (p: P) => (
+  <Svg {...p} strokeWidth={2.5}>
+    <circle cx="10" cy="10" r="6.5" fill="currentColor" fillOpacity={0.25} />
+    <path d="M15 15l6 6" strokeWidth={3.5} />
+  </Svg>
+);
+
+/** 越疊越大：往上的箭頭 */
+export const UpIcon = (p: P) => (
+  <Svg {...p} strokeWidth={3}>
+    <path d="M12 20V5M5 11l7-7 7 7" />
+  </Svg>
+);
+
+/** 規則：天平 */
+export const ScaleIcon = (p: P) => (
+  <Svg {...p}>
+    <path d="M12 3v17M7 21h10M4 7h16M4 7l-3 7M4 7l3 7M20 7l-3 7M20 7l3 7" />
+    <path d="M1 14h6a3 3 0 01-6 0zM17 14h6a3 3 0 01-6 0z" fill="currentColor" fillOpacity={0.4} />
+  </Svg>
+);
+
+export const CheckIcon = (p: P) => (
+  <Svg {...p} strokeWidth={3}>
+    <path d="M5 12.5l4.5 4.5L19 7" />
+  </Svg>
+);
+
 /** 邀請好友：一個人加號 */
 export const InviteIcon = (p: P) => (
   <Svg {...p}>

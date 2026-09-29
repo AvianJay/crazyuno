@@ -4,7 +4,7 @@
  * GPU=1 改用顯示卡（每秒 50 格上下），要測滑鼠 hover 這種即時反應就要開。
  */
 import { spawn } from 'node:child_process';
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -46,7 +46,11 @@ function globToRegExp(pattern) {
   return new RegExp(`^${source}$`);
 }
 
-export async function launch({ port = 9333 } = {}) {
+/**
+ * port 預設 0 = 讓 Edge 自己挑一個空的，再從使用者資料夾的 DevToolsActivePort 讀出來。
+ * 不寫死：Windows（Hyper-V）每次開機保留的 port 範圍都不一樣，寫死的 9333 就碰過剛好被保留、Edge 開不起來。
+ */
+export async function launch({ port = 0 } = {}) {
   const dir = mkdtempSync(join(tmpdir(), 'edge-cdp-'));
   const gl =
     process.env.GPU === '1'
@@ -54,13 +58,16 @@ export async function launch({ port = 9333 } = {}) {
       : ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'];
   // 全新的使用者資料夾：Edge 會同步裝上一堆擴充功能、開歡迎頁、在背景更新元件，記憶體少的時候整個慢到截一張圖要好幾秒
   const lean = ['--disable-extensions', '--disable-sync', '--disable-background-networking', '--disable-component-update', '--no-default-browser-check', '--renderer-process-limit=2'];
-  const proc = spawn(EDGE, ['--headless=new', ...gl, ...lean, `--remote-debugging-port=${port}`, `--user-data-dir=${dir}`, '--no-first-run', 'about:blank'], {
+  // 關掉「上一頁快取」：新版 Edge 換頁時會把開著 WebSocket 的頁面整個凍結起來，連線不會斷，斷線重連的測試就測不到
+  const noCache = ['--disable-features=BackForwardCache'];
+  const proc = spawn(EDGE, ['--headless=new', ...gl, ...lean, ...noCache, `--remote-debugging-port=${port}`, `--user-data-dir=${dir}`, '--no-first-run', 'about:blank'], {
     stdio: 'ignore',
   });
   let version;
   for (let i = 0; i < 100 && !version; i++) {
     try {
-      version = await (await fetch(`http://127.0.0.1:${port}/json/version`)).json();
+      const actual = port || Number(readFileSync(join(dir, 'DevToolsActivePort'), 'utf8').split('\n')[0]);
+      version = await (await fetch(`http://127.0.0.1:${actual}/json/version`)).json();
     } catch {
       await sleep(100);
     }

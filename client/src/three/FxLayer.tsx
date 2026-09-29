@@ -24,6 +24,13 @@ function splitEmoji(text: string) {
   );
 }
 
+/** 大字比畫面寬（手機直放、名字又長）就把字縮小到塞得下。offsetWidth 不受動畫的 transform 影響 */
+function fitWidth(el: HTMLDivElement | null) {
+  if (!el?.parentElement) return;
+  const max = el.parentElement.clientWidth * 0.94;
+  if (el.offsetWidth > max) el.style.fontSize = `${(parseFloat(getComputedStyle(el).fontSize) * max) / el.offsetWidth}px`;
+}
+
 /** 畫面上砸下來的大字和全螢幕閃光（用 HTML 做，中文才清楚） */
 export function FxLayer() {
   const [slams, setSlams] = useState<Slam[]>([]);
@@ -56,6 +63,7 @@ export function FxLayer() {
       {slams.map((s, i) => (
         <div
           key={s.id}
+          ref={fitWidth}
           className={`slam ${s.tone}`}
           style={{ '--c': s.color ?? '#fff', top: `${34 + (i - slams.length + 1) * 12}%` } as CSSProperties}
         >

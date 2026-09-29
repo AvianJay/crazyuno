@@ -415,12 +415,12 @@ svg {
   width: 980px;
   padding: 14px 20px 10px;
   display: grid;
-  grid-template-columns: 360px 1fr;
+  grid-template-columns: 360px 1fr auto;
   grid-template-areas:
-    'title title'
-    'seats deck'
-    'start settings'
-    'legal legal';
+    'title title title'
+    'seats deck deck'
+    'rules settings start'
+    'legal legal legal';
   gap: 14px 16px;
 }
 
@@ -480,6 +480,12 @@ svg {
 
 .deck-panel {
   grid-area: deck;
+  --flip: 64px;
+}
+
+.rules-panel {
+  grid-area: rules;
+  --flip: 54px;
 }
 
 .panel-head {
@@ -503,6 +509,11 @@ svg {
 .panel-head .bolt {
   color: var(--yellow);
   filter: drop-shadow(0 0 6px var(--yellow));
+}
+
+.panel-head .scale {
+  color: var(--cyan);
+  filter: drop-shadow(0 0 6px var(--cyan));
 }
 
 .panel-head .lock {
@@ -585,7 +596,7 @@ svg {
   animation: breathe 1.4s ease-in-out infinite;
 }
 
-/* 怪牌 + 0/7 規則一排：開 = 牌面朝上會發光，關 = 翻到背面 */
+/* 怪牌一排、規則一排：開 = 牌面朝上會發光，關 = 翻到背面 */
 .deck-grid {
   display: flex;
   align-items: flex-start;
@@ -608,32 +619,9 @@ svg {
   animation-delay: calc(0.4s + var(--i) * 0.07s);
 }
 
-/* 怪牌和規則中間的分隔：⇄ 下面拉一條線 */
-.deck-divider {
-  flex: none;
-  align-self: stretch;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 6px;
-  padding-top: 4px;
-  font-size: 1rem;
-  color: var(--cyan);
-  filter: drop-shadow(0 0 6px var(--cyan));
-  animation: fade-in 0.5s ease-out 0.7s backwards;
-}
-
-.deck-divider::after {
-  content: '';
-  flex: 1;
-  width: 2px;
-  border-radius: 2px;
-  background: linear-gradient(rgba(62, 224, 255, 0.6), transparent);
-}
-
 .flip {
   position: relative;
-  width: 72px;
+  width: var(--flip, 72px);
   aspect-ratio: 2 / 3;
   transform-style: preserve-3d;
   /* 透視寫在 transform 裡：寫成外層的 perspective 屬性，外層會變成說明框的定位基準 */
@@ -673,10 +661,35 @@ svg {
   scale: 1.08;
 }
 
-.flip .pair {
+.flip .pair,
+.flip .solo {
   position: absolute;
   inset: 0;
   backface-visibility: hidden;
+}
+
+/* 規則卡牌面上的小徽章：說明這條規則在幹嘛 */
+.rule-badge {
+  position: absolute;
+  left: 50%;
+  bottom: -6%;
+  translate: -50% 0;
+  width: 44%;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: calc(var(--flip, 72px) * 0.26);
+  color: #06202a;
+  background: var(--cyan);
+  border: 2px solid #fff;
+  box-shadow: 0 0 10px rgba(62, 224, 255, 0.9);
+}
+
+/* 暫時沒作用的規則（例如疊加關掉時的越疊越大）：變暗、名字劃掉（見 .crazy-name）。不能用 opacity 蓋整張 .flip，會把翻牌壓扁 */
+.rule-card.moot .flip img,
+.rule-card.moot .rule-badge {
+  opacity: 0.35;
 }
 
 .flip .pair img {
@@ -686,13 +699,13 @@ svg {
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
 }
 
-.flip .pair img:first-child {
+.flip .pair img:first-of-type {
   top: 0;
   left: -4%;
   rotate: -10deg;
 }
 
-.flip .pair img:last-child {
+.flip .pair img:last-of-type {
   bottom: 0;
   right: -4%;
   rotate: 8deg;
@@ -723,6 +736,12 @@ svg {
 .crazy-card.on .crazy-name,
 .rule-card.on .crazy-name {
   color: var(--ink);
+}
+
+/* 沒作用的規則開著也一樣變暗 */
+.rule-card.moot .crazy-name {
+  text-decoration: line-through;
+  color: var(--muted);
 }
 
 /* 說明：滑鼠移上去（手機點一下）才蓋在面板上緣冒出來，寬度跟著面板，不會跑出畫面 */
@@ -920,8 +939,14 @@ svg {
       'title title'
       'seats seats'
       'deck deck'
+      'rules rules'
       'settings start'
       'legal legal';
+  }
+
+  .deck-panel,
+  .rules-panel {
+    --flip: 64px;
   }
 
   /* 十個人一排放得下 */
@@ -934,13 +959,13 @@ svg {
   }
 }
 
-/* 直的手機：整個縮成窄的一欄，六張牌還是排成一排 */
+/* 直的手機：整個縮成窄的一欄，七張怪牌還是排成一排 */
 @container lobby (max-aspect-ratio: 9/10) {
   .lobby {
     width: 400px;
     padding: 12px 14px 8px;
     grid-template-columns: 1fr;
-    grid-template-areas: 'title' 'seats' 'deck' 'settings' 'start' 'legal';
+    grid-template-areas: 'title' 'seats' 'deck' 'rules' 'settings' 'start' 'legal';
     gap: 12px;
   }
 
@@ -957,11 +982,12 @@ svg {
   }
 
   .deck-grid {
-    gap: 5px;
+    gap: 4px;
   }
 
-  .flip {
-    width: 46px;
+  .deck-panel,
+  .rules-panel {
+    --flip: 46px;
   }
 
   .crazy-name {
@@ -1461,6 +1487,28 @@ svg {
   font-weight: 900;
 }
 
+/* 清倉一次丟了幾張 */
+.feed-mult {
+  color: var(--yellow);
+  font-style: italic;
+  font-weight: 900;
+}
+
+.feed-challenge {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  font-size: 1.1rem;
+}
+
+.feed-challenge.ok {
+  color: #7dff9b;
+}
+
+.feed-challenge.bad {
+  color: #ff5a5a;
+}
+
 .feed-icon {
   font-size: 1.2rem;
 }
@@ -1651,7 +1699,9 @@ svg {
   }
 
   .seat3d .catch-btn,
-  .seat3d .swap-btn {
+  .seat3d .swap-btn,
+  .seat3d .challenge-btn,
+  .seat3d .reveal {
     margin: 0 -4px 0 0;
   }
 }
@@ -1716,6 +1766,99 @@ svg {
 
 .swap-btn:active {
   transform: scale(0.9);
+}
+
+/* +4 質疑：出 +4 的人名牌上冒出放大鏡 + 原本的顏色 ——「他其實有這個顏色？」 */
+.challenge-btn {
+  pointer-events: auto;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  height: 38px;
+  padding: 0 8px 0 9px;
+  margin-top: 3px;
+  border-radius: 999px;
+  border: 2px solid #fff;
+  background: #1b1030;
+  font-size: 1.2rem;
+  box-shadow: 0 0 18px var(--c);
+  animation:
+    pop-in 0.4s var(--bounce),
+    breathe 1s ease-in-out 0.4s infinite;
+  transition: transform 0.12s var(--bounce);
+}
+
+.challenge-btn:hover {
+  transform: scale(1.12);
+}
+
+.challenge-btn:active {
+  transform: scale(0.9);
+}
+
+/* 原本的顏色：轉 45 度的小方塊，問號不跟著轉 */
+.challenge-diamond {
+  position: relative;
+  isolation: isolate;
+  width: 24px;
+  height: 24px;
+  display: grid;
+  place-items: center;
+  font-size: 0.85rem;
+  font-weight: 900;
+  text-shadow: 0 1px 2px #000;
+}
+
+.challenge-diamond::before {
+  content: '';
+  position: absolute;
+  inset: 3px;
+  z-index: -1;
+  border-radius: 4px;
+  border: 2px solid #fff;
+  background: var(--c);
+  rotate: 45deg;
+}
+
+/* 質疑完：抓包就在名牌下面攤開他那個顏色的牌，清白就打勾 */
+.reveal {
+  display: flex;
+  align-items: center;
+  margin-top: 5px;
+  padding: 4px 8px;
+  border-radius: 12px;
+  background: rgba(8, 10, 18, 0.92);
+  border: 2px solid var(--c);
+  box-shadow: 0 0 18px var(--c);
+  animation: pop-in 0.4s var(--bounce);
+  white-space: nowrap;
+}
+
+.reveal img {
+  width: 30px;
+  height: 45px;
+  border-radius: 4px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.6);
+  rotate: calc((var(--i) - 2) * 5deg);
+  animation: pop-in 0.35s var(--bounce) both;
+  animation-delay: calc(0.35s + var(--i) * 0.08s);
+}
+
+.reveal img + img {
+  margin-left: -9px;
+}
+
+.reveal-more {
+  margin-left: 4px;
+  font-size: 0.85rem;
+  font-weight: 900;
+}
+
+.reveal.clean {
+  font-size: 1.5rem;
+  color: #7dff9b;
+  border-color: #7dff9b;
+  box-shadow: 0 0 18px #7dff9b;
 }
 
 /* 抽牌堆右下角的張數 */

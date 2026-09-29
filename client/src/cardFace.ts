@@ -275,6 +275,56 @@ const ICONS: Partial<Record<CardKind, Icon>> = {
     g.restore();
   },
 
+  // 見者有份：+2 往四面八方炸開
+  drawAll(g, s, fill) {
+    for (let i = 0; i < 8; i++) {
+      const a = ((i + 0.5) / 8) * Math.PI * 2;
+      const [x, y] = [Math.cos(a), Math.sin(a)];
+      inked(
+        g,
+        s,
+        () => {
+          g.beginPath();
+          g.moveTo(x * s * 0.33, y * s * 0.33);
+          g.lineTo(x * s * 0.46, y * s * 0.46);
+        },
+        fill,
+        'stroke',
+        s * 0.075,
+      );
+    }
+    label(g, '+2', 0, s * 0.02, s * 0.4, s * 0.46, fill);
+  },
+
+  // 清倉：一疊牌一口氣飛出去
+  discardAll(g, s, fill) {
+    for (const [y, len] of [
+      [-0.02, 0.2],
+      [0.14, 0.3],
+      [0.3, 0.16],
+    ]) {
+      inked(
+        g,
+        s,
+        () => {
+          g.beginPath();
+          g.moveTo(-s * 0.46, s * y);
+          g.lineTo(-s * (0.46 - len), s * (y - len * 0.6));
+        },
+        fill,
+        'stroke',
+        s * 0.06,
+      );
+    }
+    for (let i = 0; i < 3; i++) {
+      g.save();
+      g.translate(s * (-0.06 + i * 0.14), s * (0.06 - i * 0.12));
+      g.rotate(-0.5 + i * 0.28);
+      inked(g, s, () => rounded(g, -s * 0.12, -s * 0.18, s * 0.24, s * 0.36, s * 0.05), i === 2 ? fill : '#fff', 'fill');
+      g.restore();
+    }
+  },
+
   // 大風吹：漩渦
   swapAll(g, s, fill) {
     inked(
