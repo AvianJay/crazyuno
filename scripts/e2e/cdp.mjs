@@ -39,6 +39,12 @@ function connect(url) {
   });
 }
 
+/** CDP urlPattern 的萬用字元（* 任意長度、? 一個字）轉成 RegExp，才知道請求是哪個 route 攔到的 */
+function globToRegExp(pattern) {
+  const source = pattern.replace(/[.+^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*').replace(/\?/g, '.');
+  return new RegExp(`^${source}$`);
+}
+
 export async function launch({ port = 9333 } = {}) {
   const dir = mkdtempSync(join(tmpdir(), 'edge-cdp-'));
   const proc = spawn(
@@ -66,8 +72,12 @@ export async function launch({ port = 9333 } = {}) {
       conn.on((msg) => {
         if (msg.sessionId !== sessionId) return;
         const p = msg.params;
-        if (msg.method === 'Runtime.consoleAPICalled')
-          logs.push(`[${label} console.${p.type}] ${p.args.map((a) => a.value ?? a.description ?? '').join(' ')}`);
+        if (msg.method === 'Runtime.consoleAPICalled') {
+          // 參數可能是物件（React 的警告會把 component stack 放在第二個參數）
+          const text = p.args.map((a) => a.value ?? a.description ?? (a.preview ? JSON.stringify(a.preview.properties ?? []) : '')).join(' ');
+          const stack = p.stackTrace?.callFrames?.slice(0, 6).map((f) => `${f.functionName || '?'}@${f.url.split('/').pop()}:${f.lineNumber + 1}`).join(' <- ');
+          logs.push(`[${label} console.${p.type}] ${text}${stack ? `\n    ${stack}` : ''}`);
+        }
         if (msg.method === 'Runtime.exceptionThrown')
           logs.push(`[${label} EXCEPTION] ${p.exceptionDetails.exception?.description ?? p.exceptionDetails.text}`);
         if (msg.method === 'Log.entryAdded') logs.push(`[${label} log.${p.entry.level}] ${p.entry.text} ${p.entry.url ?? ''}`);
@@ -107,7 +117,34 @@ export async function launch({ port = 9333 } = {}) {
           writeFileSync(path, Buffer.from(data, 'base64'));
         },
         click: (selector) => page.eval(`document.querySelector(${JSON.stringify(selector)}).click()`),
+        /**
+         * 攔截符合 urlPattern（CDP 樣式：* 任意長度、? 一個字，例如 '*api/token*'）的請求，直接回假的 JSON。
+         * 用來擋掉需要真的 Discord 憑證的 /api/token。
+         * 可以設很多個樣式；同一個樣式再設一次會換掉回應。
+         */
+        async route(urlPattern, body, status = 200) {
+          routes.set(urlPattern, { test: globToRegExp(urlPattern), body, status });
+          // Fetch.enable 每次都是整組換掉，所以要把全部樣式一起帶上
+          await send('Fetch.enable', { patterns: [...routes.keys()].map((p) => ({ urlPattern: p })) });
+        },
       };
+
+      /** page.route() 設的攔截：樣式 → 要回的假資料。只掛一個 handler，一個請求只會回一次 */
+      const routes = new Map();
+      conn.on((msg) => {
+        if (msg.sessionId !== sessionId || msg.method !== 'Fetch.requestPaused') return;
+        const { requestId, request } = msg.params;
+        const route = [...routes.values()].find((r) => r.test.test(request.url));
+        const reply = route
+          ? send('Fetch.fulfillRequest', {
+              requestId,
+              responseCode: route.status,
+              responseHeaders: [{ name: 'Content-Type', value: 'application/json' }],
+              body: Buffer.from(JSON.stringify(route.body)).toString('base64'),
+            })
+          : send('Fetch.continueRequest', { requestId });
+        reply.catch(() => {});
+      });
       return page;
     },
     close() {

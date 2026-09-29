@@ -878,6 +878,201 @@ svg {
   transform: rotate(90deg) scale(1.1);
 }
 
+/* ---------- 邀請好友 ---------- */
+
+/* 外觀看在哪裡：牌桌上是 .icon-btn（跟右上角其他按鈕一起縮放），大廳是下面的 .lobby-invite */
+.invite-btn:disabled {
+  opacity: 0.5;
+}
+
+/* 大廳裡掛在座位面板底下，置中 */
+.lobby-invite {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  background: rgba(0, 0, 0, 0.45);
+  display: grid;
+  place-items: center;
+  font-size: 1.25rem;
+  color: var(--ink);
+  transition:
+    transform 0.15s var(--bounce),
+    border-color 0.2s,
+    background 0.2s;
+  margin: 14px auto 0;
+}
+
+.lobby-invite:hover:not(:disabled) {
+  transform: scale(1.1);
+  border-color: var(--cyan);
+  background: rgba(62, 224, 255, 0.2);
+}
+
+.lobby-invite:active:not(:disabled) {
+  transform: scale(0.92);
+}
+
+.invite-note {
+  position: fixed;
+  left: 50%;
+  bottom: calc(24px + var(--saib));
+  translate: -50% 0;
+  z-index: 80;
+  padding: 8px 18px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.85);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  font-size: 0.85rem;
+  animation: pop-in 0.3s var(--bounce);
+}
+
+/* 語音頻道裡還沒加入的人 */
+.voice-waiting {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px dashed rgba(255, 255, 255, 0.15);
+  animation: fade-in 0.5s ease-out;
+}
+
+.voice-waiting-label {
+  font-size: 0.76rem;
+  color: var(--muted);
+}
+
+.voice-waiting-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.voice-waiting-person {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px 4px 4px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  font-size: 0.78rem;
+  color: var(--muted);
+  max-width: 160px;
+}
+
+.voice-waiting-person .avatar {
+  width: 24px;
+  height: 24px;
+  font-size: 0.7rem;
+}
+
+.voice-waiting-person span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ---------- 誰在說話 ---------- */
+
+/* 大廳座位上的麥克風：頭像右上角 */
+.speaking-badge {
+  position: absolute;
+  right: -4px;
+  bottom: -4px;
+  font-size: 1.05rem;
+  color: var(--cyan);
+  background: rgba(0, 0, 0, 0.85);
+  border-radius: 50%;
+  padding: 2px;
+  filter: drop-shadow(0 0 6px var(--cyan));
+  animation: speak-pulse 0.9s ease-in-out infinite;
+}
+
+/* 牌桌座位上：蓋在頭像中間，跟機器人徽章同一個位置 */
+.seat3d .speaking-badge {
+  position: absolute;
+  inset: auto auto 0 0;
+  right: auto;
+  bottom: -2px;
+  font-size: 1rem;
+}
+
+/* 說話的人頭像亮一圈 */
+.seats li.speaking .seat-avatar .avatar {
+  border-color: var(--cyan);
+  box-shadow: 0 0 14px var(--cyan);
+}
+
+.seat3d.speaking {
+  border-color: var(--cyan);
+  box-shadow: 0 0 16px rgba(62, 224, 255, 0.55);
+}
+
+@keyframes speak-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.18);
+    opacity: 0.75;
+  }
+}
+
+/* ---------- 授權失敗 ---------- */
+
+.auth-title {
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: var(--yellow);
+}
+
+/* 倒數完就自動把活動關掉 */
+.auth-countdown {
+  font-size: 0.82rem;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  animation: breathe 1.6s ease-in-out infinite;
+}
+
+.loader.error.auth .loader-caption {
+  max-width: 34ch;
+  line-height: 1.5;
+}
+
+.auth-actions {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-top: 6px;
+}
+
+.auth-exit {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 11px 20px;
+  border-radius: 999px;
+  border: 2px solid rgba(255, 255, 255, 0.35);
+  background: rgba(255, 255, 255, 0.1);
+  font-size: 0.92rem;
+  transition:
+    transform 0.15s var(--bounce),
+    border-color 0.2s,
+    background 0.2s;
+}
+
+.auth-exit:hover {
+  transform: scale(1.05);
+  border-color: var(--red);
+  background: rgba(229, 56, 59, 0.25);
+}
+
+.auth-exit:active {
+  transform: scale(0.95);
+}
+
 /* ---------- 3D 牌桌 ---------- */
 
 .table3d {
@@ -1589,6 +1784,11 @@ svg {
     width: 36px;
     height: 36px;
     font-size: 1.05rem;
+  }
+
+  /* 第四顆（邀請）怎麼縮都會撞到，牌桌上先藏起來；回大廳還能邀 */
+  .hud-right .invite-btn {
+    display: none;
   }
 
   .timer-ring {

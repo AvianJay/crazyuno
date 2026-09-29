@@ -111,11 +111,19 @@ export interface GameView {
   log: string[];
 }
 
+/** 一桌最多幾個人（伺服器的 maxClients 跟 Discord Rich Presence 的 party size 都用這個） */
+export const MAX_PLAYERS = 10;
+
 export interface Seat {
   id: string;
   name: string;
   avatar: string | null;
   connected: boolean;
+  /**
+   * Discord 使用者 id（瀏覽器直接開的人是 null）。
+   * 語音事件只給 user id，前端靠這個把「誰在說話」對到座位上。
+   */
+  discordId?: string | null;
 }
 
 /** 伺服器每次狀態改變時送給每個玩家的完整資料 */

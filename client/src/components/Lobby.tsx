@@ -1,8 +1,10 @@
-import { ALL_CARDS, type CardDef, type CardKind, type RoomView } from '@crazyuno/shared';
+import { ALL_CARDS, type CardDef, type CardKind, type RoomView, type Seat } from '@crazyuno/shared';
 import type { CSSProperties, ReactNode } from 'react';
 import type { Send } from '../App';
 import { backImage, faceImage } from '../cardFace';
 import * as sfx from '../sfx';
+import { useIsSpeaking } from '../useDiscord';
+import { useVoiceMembers } from '../useVoiceMembers';
 import { Avatar } from './Avatar';
 import {
   BoltIcon,
@@ -13,6 +15,7 @@ import {
   HourglassIcon,
   InfinityIcon,
   LockIcon,
+  MicIcon,
   MinusIcon,
   PlayersIcon,
   PlayIcon,
@@ -20,6 +23,7 @@ import {
   SwapIcon,
   TimerIcon,
 } from './icons';
+import { InviteButton } from './InviteButton';
 import { LegalLinks } from './Legal';
 import { FloatingCards } from './Loader';
 
@@ -30,6 +34,8 @@ export function Lobby({ view, send }: { view: RoomView; send: Send }) {
   const isHost = view.you === view.hostId;
   const s = view.settings;
   const host = view.seats.find((seat) => seat.id === view.hostId);
+  // 語音頻道裡還沒進來玩的人：房主可以直接邀他們
+  const waiting = useVoiceMembers(view.seats.map((s) => s.discordId));
   // 用「切換一張」「加減多少」的訊息，連點的時候伺服器才會照順序一個一個改
   const toggle = (kind: CardKind) => {
     sfx.flick();
@@ -56,17 +62,7 @@ export function Lobby({ view, send }: { view: RoomView; send: Send }) {
           </h2>
           <ul className="seats">
             {view.seats.map((seat, i) => (
-              <li
-                key={seat.id}
-                className={`${seat.connected ? '' : 'offline'} ${seat.id === view.you ? 'me' : ''}`}
-                style={{ '--i': i } as CSSProperties}
-              >
-                <div className="seat-avatar">
-                  <Avatar name={seat.name} src={seat.avatar} />
-                  {seat.id === view.hostId && <CrownIcon className="crown" />}
-                </div>
-                <span className="seat-label">{seat.name}</span>
-              </li>
+              <SeatChip key={seat.id} seat={seat} index={i} me={seat.id === view.you} host={seat.id === view.hostId} />
             ))}
             {view.seats.length < 2 && (
               <li className="empty-seat" aria-label="等其他人加入">
@@ -76,6 +72,20 @@ export function Lobby({ view, send }: { view: RoomView; send: Send }) {
               </li>
             )}
           </ul>
+          <InviteButton className="lobby-invite" />
+          {waiting.length > 0 && (
+            <div className="voice-waiting">
+              <span className="voice-waiting-label">在語音頻道裡還沒加入：</span>
+              <div className="voice-waiting-list">
+                {waiting.map((m) => (
+                  <div key={m.id} className="voice-waiting-person" title={m.name}>
+                    <Avatar name={m.name} src={m.avatar} />
+                    <span>{m.name}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </section>
 
         <section className="panel" style={{ '--i': 1 } as CSSProperties}>
@@ -202,6 +212,24 @@ export function Lobby({ view, send }: { view: RoomView; send: Send }) {
         <LegalLinks />
       </div>
     </div>
+  );
+}
+
+/** 座位清單的一格。自己訂閱「在不在說話」，有人開口時只重畫這一格 */
+function SeatChip({ seat, index, me, host }: { seat: Seat; index: number; me: boolean; host: boolean }) {
+  const speaking = useIsSpeaking(seat.discordId);
+  return (
+    <li
+      className={`${seat.connected ? '' : 'offline'} ${me ? 'me' : ''} ${speaking ? 'speaking' : ''}`}
+      style={{ '--i': index } as CSSProperties}
+    >
+      <div className="seat-avatar">
+        <Avatar name={seat.name} src={seat.avatar} />
+        {host && <CrownIcon className="crown" />}
+        {speaking && <MicIcon className="speaking-badge" />}
+      </div>
+      <span className="seat-label">{seat.name}</span>
+    </li>
   );
 }
 

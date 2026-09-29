@@ -13,6 +13,7 @@ import { FxLayer } from '../three/FxLayer';
 import { FOV, seatMap } from '../three/layout';
 import { chooseQuality, initialQuality, rememberAutoLow, type QualityState } from '../three/quality';
 import { Scene } from '../three/Scene';
+import { useOverheated } from '../useDiscord';
 import { Avatar } from './Avatar';
 import {
   ClockIcon,
@@ -34,6 +35,7 @@ import {
   TrophyIcon,
   WaveIcon,
 } from './icons';
+import { InviteButton } from './InviteButton';
 
 /** 右上角的動態紀錄，用頭像 + 小圖代替文字 */
 interface FeedItem {
@@ -169,6 +171,19 @@ export function Table({ view, game, send }: { view: RoomView; game: GameView; se
     });
   }, []);
 
+  // 手機過熱（Discord 通知的）：自動換省電。
+  // 用 hook 直接讀狀態，不是聽一次性事件，所以在大廳就過熱也接得到。
+  //
+  // 這個會蓋掉玩家自己選的高畫質：過熱代表系統在降頻了，再硬撐只會更卡、更燙，
+  // 所以跟「跑不動」不一樣，這裡不尊重 userChosen。但只降這一次，
+  // 不寫進 localStorage（手機涼了就恢復），玩家想切回高畫質還是可以自己按。
+  const overheated = useOverheated();
+  useEffect(() => {
+    if (!overheated) return;
+    console.warn('[crazyuno-perf] 手機過熱，換成省電畫質');
+    setQuality((q) => (q.quality === 'low' ? q : { quality: 'low', userChosen: false }));
+  }, [overheated]);
+
   const turnPlayer = playerOf(game.turnId);
   /** 離線（機器人代打中） */
   const isBot = (id: string) => !view.seats.find((s) => s.id === id)?.connected;
@@ -238,6 +253,8 @@ export function Table({ view, game, send }: { view: RoomView; game: GameView; se
         {secondsLeft !== null && game.phase === 'playing' && (
           <TimerRing left={secondsLeft} total={view.settings.turnSeconds} />
         )}
+        {/* 窄螢幕會藏起來（見 styles.css），大廳還有一顆 */}
+        <InviteButton className="icon-btn" />
         <button
           className={`icon-btn ${quality.quality === 'low' ? 'eco' : ''}`}
           aria-label={quality.quality === 'high' ? '高畫質（點一下換省電）' : '省電畫質（點一下換高畫質）'}

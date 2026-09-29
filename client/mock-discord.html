@@ -1,0 +1,173 @@
+<!doctype html>
+<!--
+  測試用的假 Discord 客戶端：把活動放在 iframe 裡，並實作 Embedded App SDK 的 RPC 協議。
+  只有 scripts/e2e/discord.mjs 會用到，正式版不會碰到這個檔案。
+-->
+<html lang="zh-Hant">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Mock Discord</title>
+    <style>
+      html, body { margin: 0; height: 100%; background: #111; }
+      iframe { width: 100%; height: 100%; border: 0; }
+      #log { position: fixed; right: 4px; bottom: 4px; color: #0f0; font: 11px monospace; z-index: 9; }
+    </style>
+  </head>
+  <body>
+    <iframe id="app"></iframe>
+    <div id="log"></div>
+    <script>
+      // 測試可以從外面調整行為：拒絕授權、沒有建立邀請權限、DM 情境、過熱…
+      const params = new URLSearchParams(location.search);
+      const mode = params.get('mode') ?? 'ok';
+      const calls = [];
+      /** 最後一次授權通過的權限，AUTHENTICATE 照這個回 */
+      let grantedScopes = [];
+      window.__calls = calls;
+
+      const frame = document.getElementById('app');
+      const appUrl = new URL('/index.html', location.origin);
+      appUrl.searchParams.set('frame_id', 'mock-frame');
+      // 同一個 instance_id = 同一個活動實例 = 同一桌。
+      // 真的 Discord 是「同一個語音頻道裡開的活動」共用一個 instanceId，
+      // 所以測試要用 ?instance=xxx 讓多個分頁進同一桌。
+      appUrl.searchParams.set('instance_id', params.get('instance') ?? 'i-mock-instance');
+      appUrl.searchParams.set('platform', params.get('platform') ?? 'desktop');
+      if (mode !== 'dm') {
+        appUrl.searchParams.set('guild_id', '900000000000000001');
+        appUrl.searchParams.set('channel_id', '900000000000000002');
+      }
+      appUrl.searchParams.set('room', params.get('room') ?? 'mock');
+      appUrl.searchParams.set('name', params.get('name') ?? 'MockUser');
+      if (params.get('hq')) appUrl.searchParams.set('hq', '1');
+      frame.src = appUrl.toString();
+
+      const log = (m) => { document.getElementById('log').textContent = calls.length + ' calls'; };
+
+      // 每個分頁可以當不同的人（?user=…）；沒給就固定一個 id。
+      // 用同一個 id 開兩個分頁 = 同一個人重新加入，舊的連線會被踢掉。
+      const userId = params.get('user') ?? '111111111111111111';
+      const USER = {
+        id: userId,
+        username: params.get('name') ?? 'mockuser',
+        discriminator: '0',
+        global_name: params.get('name') ?? 'MockUser',
+        avatar: null,
+        avatar_decoration_data: null,
+        bot: false,
+        flags: 0,
+        public_flags: 0,
+      };
+
+      const FRIEND = {
+        id: '222222222222222222',
+        username: 'friend',
+        discriminator: '0',
+        global_name: '還沒進來的朋友',
+        avatar: null,
+        avatar_decoration_data: null,
+        bot: false,
+        flags: 0,
+        public_flags: 0,
+      };
+
+      /** 每個 RPC 指令的假回應 */
+      function respond(cmd, args, evt) {
+        calls.push({ cmd, args, evt });
+        switch (cmd) {
+          case 'AUTHORIZE':
+            // 使用者按下「拒絕」時，Discord 客戶端不會回 code
+            if (mode === 'deny') throw { code: 4006, message: '使用者拒絕了授權' };
+            // 只肯給 identify：要其他權限的那一次按了取消
+            if (mode === 'identify-only' && args.scope.some((s) => s !== 'identify')) throw { code: 5000, message: '使用者取消了授權' };
+            grantedScopes = args.scope;
+            return { code: 'mock-oauth-code' };
+          case 'AUTHENTICATE':
+            return {
+              // 照抄前端給的 token（測試把 /api/token 換成 mock:<使用者 id>，伺服器會用它認人）
+              access_token: args.access_token,
+              user: USER,
+              scopes: grantedScopes,
+              expires: new Date(Date.now() + 7 * 864e5).toISOString(),
+              application: { id: '1553795672069906582', name: 'MadCards', description: 'mock' },
+            };
+          case 'ENCOURAGE_HW_ACCELERATION':
+            return { enabled: params.get('hwaccel') === 'off' };
+          case 'GET_CHANNEL':
+            return {
+              id: '900000000000000002',
+              type: 2,
+              guild_id: '900000000000000001',
+              name: '測試語音',
+              voice_states: [
+                { user: USER, nick: USER.global_name, mute: false, volume: 100, voice_state: { deaf: false, mute: false, self_mute: false, self_deaf: false, suppress: false } },
+                { user: FRIEND, nick: FRIEND.global_name, mute: false, volume: 100, voice_state: { deaf: false, mute: false, self_mute: false, self_deaf: false, suppress: false } },
+              ],
+              messages: [],
+            };
+          case 'GET_CHANNEL_PERMISSIONS':
+            return { permissions: mode === 'noperm' ? '0' : '1' };
+          case 'SET_ACTIVITY':
+            return { type: 0, name: 'MadCards', details: args?.activity?.details ?? null, state: args?.activity?.state ?? null };
+          case 'OPEN_INVITE_DIALOG':
+            // DM 或沒有權限時 Discord 會丟 INVALID_PERMISSIONS / INVALID_CHANNEL
+            if (mode === 'noperm') throw { code: 4006, message: 'Invalid permissions' };
+            if (mode === 'dm') throw { code: 4005, message: 'Invalid channel' };
+            return null;
+          case 'SHARE_LINK':
+            return { success: mode !== 'nocancel', didCopyLink: true, didSendMessage: true };
+          case 'SUBSCRIBE':
+          case 'UNSUBSCRIBE':
+            return { evt: evt ?? '' };
+          case 'CAPTURE_LOG':
+            return null;
+          default:
+            return null;
+        }
+      }
+
+      let appWindow = null;
+
+      window.addEventListener('message', (ev) => {
+        if (ev.source !== frame.contentWindow) return;
+        const data = ev.data;
+        if (!Array.isArray(data)) return;
+        const [opcode, payload] = data;
+        appWindow = ev.source;
+
+        // 0 = HANDSHAKE：回一個 READY，SDK 的 ready() 才會結束
+        if (opcode === 0) {
+          post(1, { cmd: 'DISPATCH', evt: 'READY', nonce: null, data: { v: 1, config: { cdn_host: 'cdn.discordapp.com', api_endpoint: '//discord.com/api', environment: 'production' } } });
+          // 順便送一次過熱事件，測自動降畫質
+          if (params.get('thermal')) setTimeout(() => post(1, { cmd: 'DISPATCH', evt: 'THERMAL_STATE_UPDATE', nonce: null, data: { thermal_state: Number(params.get('thermal')) } }), 3000);
+          return;
+        }
+        // 1 = FRAME：一般指令
+        if (opcode === 1) {
+          const { cmd, args, nonce, evt } = payload;
+          try {
+            post(1, { cmd, data: respond(cmd, args, evt), evt: null, nonce });
+          } catch (err) {
+            post(1, { cmd, data: err, evt: 'ERROR', nonce });
+          }
+          return;
+        }
+        // 2 = CLOSE：活動自己關掉了
+        if (opcode === 2) {
+          window.__closed = payload;
+          log();
+        }
+      });
+
+      function post(opcode, payload) {
+        if (appWindow) appWindow.postMessage([opcode, payload], location.origin);
+      }
+
+      /** 測試用：假裝有人在語音頻道說話（預設是自己） */
+      window.__speak = (userId = USER.id) => post(1, { cmd: 'DISPATCH', evt: 'SPEAKING_START', nonce: null, data: { channel_id: '900000000000000002', user_id: userId } });
+      window.__stopSpeaking = (userId = USER.id) => post(1, { cmd: 'DISPATCH', evt: 'SPEAKING_STOP', nonce: null, data: { channel_id: '900000000000000002', user_id: userId } });
+      window.__userId = USER.id;
+      window.__calls = calls;
+    </script>
+  </body>
+</html>

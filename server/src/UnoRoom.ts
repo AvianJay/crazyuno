@@ -9,6 +9,7 @@ import {
   drawAction,
   GameError,
   getView,
+  MAX_PLAYERS,
   passTurn,
   playCard,
   sayUno,
@@ -21,13 +22,24 @@ import {
   type RoomView,
   type Seat,
 } from '@crazyuno/shared';
+import { verifyDiscordUser } from './discordAuth';
 
 interface JoinOptions {
   roomKey?: string;
   name?: string;
   avatar?: string | null;
-  /** 認人用的 key（Discord 是使用者 id，瀏覽器是這個分頁存的亂數），重新連進來靠它拿回座位 */
+  /** 瀏覽器直接開的人認人用：這個分頁存的亂數，重新連進來靠它拿回座位 */
   userKey?: string;
+  /** Discord 登入的 access token：伺服器自己拿去問 Discord 這是誰（見 onAuth） */
+  accessToken?: string;
+}
+
+/** onAuth 確認過的身分 */
+interface SeatAuth {
+  /** 認座位用的 key：同一個 key 重新連進來就拿回原本的座位 */
+  key: string;
+  /** 驗證過的 Discord 使用者 id，前端靠它把「誰在說話」對到座位上（不是 Discord 的人是 null） */
+  discordId: string | null;
 }
 
 type Timer = ReturnType<Room['clock']['setTimeout']>;
@@ -52,10 +64,10 @@ const clamp = (n: unknown, min: number, max: number, fallback: number) => {
  * 所以前端永遠拿不到別人的手牌。
  *
  * 座位（Seat）跟連線（Client）是分開的：斷線時座位留著、遊戲中由機器人代打，
- * 同一個人（同一個 userKey）重新連進來就接回原本的座位繼續玩。
+ * 同一個人（onAuth 認出來的同一個 key）重新連進來就接回原本的座位繼續玩。
  */
 export class UnoRoom extends Room {
-  maxClients = 10;
+  maxClients = MAX_PLAYERS;
   // 沒人連著也先別關房，等大家回來（見 scheduleDispose）
   autoDispose = false;
 
@@ -69,7 +81,7 @@ export class UnoRoom extends Room {
   private sessionSeat = new Map<string, string>();
   /** 座位 → 目前接著它的連線 */
   private seatSession = new Map<string, string>();
-  /** userKey → 座位 */
+  /** 認人的 key（見 onAuth）→ 座位 */
   private keySeat = new Map<string, string>();
   /** 座位什麼時候斷線的 */
   private droppedAt = new Map<string, number>();
@@ -164,10 +176,30 @@ export class UnoRoom extends Room {
     }, 5000);
   }
 
-  onJoin(client: Client, options: JoinOptions) {
+  /**
+   * 加入前先確認身分，決定用哪個 key 認座位。
+   *
+   * Discord 的人：拿 access token 問 Discord，驗證過的 id 才拿來認座位、對語音。
+   * 不能直接相信前端報的 id：座位上的 Discord id 全桌都看得到，照抄就能搶走別人的座位和手牌。
+   * 驗證失敗（token 無效、Discord 連不上）就當一次性的訪客：照樣能玩，只是重新整理會拿到新座位。
+   *
+   * 瀏覽器直接開的人用分頁自己的亂數 key，加上 local: 前綴，不可能冒充成 Discord 的 key。
+   */
+  async onAuth(client: Client, options: JoinOptions): Promise<SeatAuth> {
+    if (typeof options.accessToken === 'string' && options.accessToken) {
+      const discordId = await verifyDiscordUser(options.accessToken.slice(0, 200));
+      if (discordId) return { key: `discord:${discordId}`, discordId };
+      console.warn('[auth] Discord token 驗證失敗，當成訪客加入');
+      return { key: `session:${client.sessionId}`, discordId: null };
+    }
+    const key = typeof options.userKey === 'string' && options.userKey ? `local:${options.userKey.slice(0, 80)}` : `session:${client.sessionId}`;
+    return { key, discordId: null };
+  }
+
+  onJoin(client: Client, options: JoinOptions, auth: SeatAuth) {
     const name = String(options.name ?? '').trim().slice(0, 20) || `玩家${this.seats.length + 1}`;
     const avatar = typeof options.avatar === 'string' && options.avatar.startsWith('https://') ? options.avatar : null;
-    const key = typeof options.userKey === 'string' && options.userKey ? options.userKey.slice(0, 80) : `session:${client.sessionId}`;
+    const { key, discordId } = auth;
 
     let seat = this.seats.find((s) => s.id === this.keySeat.get(key));
     if (seat) {
@@ -181,8 +213,9 @@ export class UnoRoom extends Room {
       }
       seat.name = name;
       seat.avatar = avatar;
+      seat.discordId = discordId;
     } else {
-      seat = { id: `p${++this.nextSeat}`, name, avatar, connected: true };
+      seat = { id: `p${++this.nextSeat}`, name, avatar, connected: true, discordId };
       this.seats.push(seat);
       this.keySeat.set(key, seat.id);
     }

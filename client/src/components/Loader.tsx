@@ -1,7 +1,8 @@
 import { COLORS, type Card } from '@crazyuno/shared';
-import { useMemo, type CSSProperties, type ReactNode } from 'react';
+import { useEffect, useMemo, useState, type CSSProperties, type ReactNode } from 'react';
 import { backImage, faceImage } from '../cardFace';
-import { AlertIcon, ReplayIcon } from './icons';
+import { exitActivity, inDiscord } from '../discord';
+import { AlertIcon, ExitIcon, ReplayIcon } from './icons';
 
 /** 載入中：三張牌一直洗來洗去 */
 export function Loader({ caption }: { caption?: string }) {
@@ -44,6 +45,57 @@ export function ErrorScreen({ message }: { message: string }) {
     </div>
   );
 }
+
+/**
+ * 沒有授權（或授權被拒絕）：Discord 規定 Activity 一定要授權才能玩，
+ * 所以這裡不給「繼續」，倒數完就直接把活動關掉。
+ * 想再試一次的人可以按重新授權（會整頁重載，SDK 才能重新 authorize）。
+ */
+export function AuthScreen({ message, onRetry }: { message: string; onRetry?: () => void }) {
+  const [left, setLeft] = useState(AUTO_EXIT_SECONDS);
+
+  // 倒數完自動離開活動；不在 Discord 裡（開發測試）就只停在這個畫面
+  useEffect(() => {
+    if (!inDiscord) return;
+    if (left <= 0) {
+      exitActivity('沒有完成授權');
+      return;
+    }
+    const t = setTimeout(() => setLeft((n) => n - 1), 1000);
+    return () => clearTimeout(t);
+  }, [left]);
+
+  return (
+    <div className="loader-screen">
+      <FloatingCards />
+      <div className="loader error auth">
+        <div className="broken">
+          <img className="half left" src={backImage()} alt="" />
+          <img className="half right" src={backImage()} alt="" />
+          <AlertIcon className="broken-alert" />
+        </div>
+        <div className="auth-title">沒有完成 Discord 授權</div>
+        <div className="loader-caption">{message}</div>
+        {inDiscord && <div className="auth-countdown">{left} 秒後自動離開活動</div>}
+        <div className="auth-actions">
+          {onRetry && (
+            <button className="round-btn" onClick={onRetry} aria-label="重新授權">
+              <ReplayIcon />
+            </button>
+          )}
+          {inDiscord && (
+            <button className="auth-exit" onClick={() => exitActivity('使用者沒有完成授權')}>
+              <ExitIcon /> 馬上離開
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** 沒授權時停留幾秒再自動關掉活動（讓玩家看清楚發生什麼事） */
+const AUTO_EXIT_SECONDS = 10;
 
 const FLOATERS: Pick<Card, 'kind' | 'color' | 'value'>[] = [
   { kind: 'number', color: 'red', value: 7 },

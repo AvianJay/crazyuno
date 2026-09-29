@@ -278,3 +278,28 @@ export const SwapIcon = (p: P) => (
     <path d="M4 8h14l-4-4M20 16H6l4 4" strokeWidth={2.5} />
   </Svg>
 );
+
+/** 邀請好友：一個人加號 */
+export const InviteIcon = (p: P) => (
+  <Svg {...p}>
+    <circle cx="9" cy="8" r="3.5" fill="currentColor" fillOpacity={0.35} />
+    <path d="M2 20a7 7 0 0114 0" />
+    <path d="M18 8v6M15 11h6" strokeWidth={2.5} />
+  </Svg>
+);
+
+/** 離開活動：門 */
+export const ExitIcon = (p: P) => (
+  <Svg {...p}>
+    <path d="M14 3H5v18h9" />
+    <path d="M10 12h11M18 8l4 4-4 4" strokeWidth={2.5} />
+  </Svg>
+);
+
+/** 麥克風：正在說話 */
+export const MicIcon = (p: P) => (
+  <Svg {...p}>
+    <rect x="9" y="2" width="6" height="11" rx="3" fill="currentColor" fillOpacity={0.4} />
+    <path d="M5 11a7 7 0 0014 0M12 18v3M9 21h6" />
+  </Svg>
+);

@@ -3,9 +3,11 @@ import type { RoomView } from '@crazyuno/shared';
 import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import { getIdentity, joinRoom } from './connect';
 import { AlertIcon, ReplayIcon, WifiOffIcon } from './components/icons';
-import { ErrorScreen, Loader } from './components/Loader';
+import { AuthScreen, ErrorScreen, Loader } from './components/Loader';
 import { Lobby } from './components/Lobby';
+import { DiscordAuthError, describeError } from './discord';
 import * as sfx from './sfx';
+import { usePresence } from './usePresence';
 
 // 3D 牌桌（three.js）很大，分開載入；大廳一出來就先在背景下載
 const loadTable = () => import('./components/Table');
@@ -13,7 +15,11 @@ const Table = lazy(() => loadTable().then((m) => ({ default: m.Table })));
 
 export type Send = (type: string, payload?: unknown) => void;
 
-type Conn = { state: 'connecting' | 'ok' | 'dropped' | 'left' } | { state: 'error'; message: string };
+type Conn =
+  | { state: 'connecting' | 'ok' | 'dropped' | 'left' }
+  | { state: 'error'; message: string }
+  /** 沒授權 / 授權被拒絕：Discord 不給玩，只能關掉活動或重試 */
+  | { state: 'auth'; message: string };
 
 export function App() {
   const [view, setView] = useState<RoomView | null>(null);
@@ -21,6 +27,9 @@ export function App() {
   const [toast, setToast] = useState<{ id: number; text: string } | null>(null);
   const roomRef = useRef<Room | null>(null);
   const toastTimer = useRef<number>(undefined);
+
+  // Rich Presence：朋友看得到你在玩、還剩幾張牌
+  usePresence(view);
 
   // 瀏覽器規定要點過畫面才能播聲音
   useEffect(() => {
@@ -59,7 +68,8 @@ export function App() {
         setConn({ state: 'ok' });
       } catch (e) {
         console.error(e);
-        setConn({ state: 'error', message: describeError(e) });
+        // 授權問題要單獨處理：Discord 規定沒授權不能玩，直接請他離開活動
+        setConn(e instanceof DiscordAuthError ? { state: 'auth', message: e.message } : { state: 'error', message: describeError(e) });
       }
     })();
 
@@ -77,7 +87,10 @@ export function App() {
 
   return (
     <div className="app">
-      {!view ? (
+      {conn.state === 'auth' ? (
+        // 重試就整頁重載：SDK、授權、訂閱全部從頭來最乾淨
+        <AuthScreen message={conn.message} onRetry={() => location.reload()} />
+      ) : !view ? (
         conn.state === 'error' ? <ErrorScreen message={conn.message} /> : <Loader caption="連線中" />
       ) : view.game ? (
         <Suspense fallback={<Loader caption="擺牌桌中" />}>
@@ -106,11 +119,4 @@ export function App() {
       )}
     </div>
   );
-}
-
-/** Discord SDK 丟出來的錯誤是 { code, message } 物件，不是 Error */
-function describeError(e: unknown): string {
-  if (e instanceof Error) return e.message;
-  if (e && typeof e === 'object' && 'message' in e) return String(e.message);
-  return String(e);
 }

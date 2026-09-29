@@ -88,7 +88,7 @@ npx tsx scripts/bots.mts 3 bots   # 3 個機器人進 room=bots
 | `npm run e2e` | 用 headless Edge 跑一整局（要先開 `npm run dev`） |
 | `npm run e2e:rejoin` | 斷線重連測試 |
 | `npm run e2e:sfx` | 播一遍所有音效 |
-| `npm run e2e:discord` | Discord 整合測試（用 `client/mock-discord.html` 假客戶端，測授權、Rich Presence、邀請、語音、過熱） |
+| `npm run e2e:discord` | Discord 整合測試（用 `client/mock-discord.html` 假客戶端，測授權、Rich Presence、邀請、語音、過熱、冒充別人）。`.env` 要先加 `DISCORD_MOCK_AUTH=1` 再開 `npm run dev` |
 
 e2e 的截圖存在 `%TEMP%\crazyuno-e2e`。
 
@@ -101,7 +101,9 @@ e2e 的截圖存在 `%TEMP%\crazyuno-e2e`。
 5. **Activities → URL Mappings**：`/` 指到上面的網址（不含 `https://`）
 6. 到語音頻道的「活動」🚀 裡開 MadCards
 
-Activity 會跟使用者要這些權限：`identify`（名字、頭像）、`guilds`（語音頻道資訊）、`rpc.activities.write`（Rich Presence）、`rpc.voice.read`（誰在說話）。
+Activity 會跟使用者要這些權限：`identify`（名字、頭像，一定要）、`guilds`（語音頻道資訊）、`rpc.activities.write`（Rich Presence）、`rpc.voice.read`（誰在說話）。後三個是選擇性的：使用者拒絕的話會退回只要 `identify`，照樣能玩，只是那些功能關掉。
+
+玩家加入房間時，伺服器會拿 access token 跟 Discord 確認身分，座位是用驗證過的 Discord id 認的，前端沒辦法冒充別人。
 
 `.env` 裡 `VITE_` 開頭的值會在打包時寫死進網頁，改了要重新打包（`npm start` 會自動處理）。
 

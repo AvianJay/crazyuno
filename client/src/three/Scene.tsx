@@ -6,8 +6,9 @@ import { ToneMappingMode, type ChromaticAberrationEffect } from 'postprocessing'
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactElement, type RefObject } from 'react';
 import * as THREE from 'three';
 import { Avatar } from '../components/Avatar';
-import { DeckIcon, RobotIcon, SirenIcon, SkullIcon, SwapIcon } from '../components/icons';
+import { DeckIcon, MicIcon, RobotIcon, SirenIcon, SkullIcon, SwapIcon } from '../components/icons';
 import { formatCount } from '../count';
+import { useIsSpeaking } from '../useDiscord';
 import { backTexture, CARD_H, CARD_W, COLOR_HEX, feltTexture, glowTexture } from './cardArt';
 import { CardMesh, FACE_DOWN, FACE_UP, pose, type Pose } from './CardMesh';
 import { CameraRig, Particles, Shockwaves } from './Effects';
@@ -104,12 +105,14 @@ export function Scene(props: Props) {
         .map((p) => {
           const me = game.players.find((q) => q.id === view.you);
           const canCatch = game.phase === 'playing' && !p.out && p.handCount === 1 && !p.unoSafe && !!me && !me.out;
+          const seat = view.seats.find((s) => s.id === p.id);
           return (
             <Seat
               key={p.id}
               labels={labels}
               player={p}
-              offline={!view.seats.find((s) => s.id === p.id)?.connected}
+              offline={!seat?.connected}
+              discordId={seat?.discordId}
               pos={seats.get(p.id)!}
               active={p.id === game.turnId && game.phase === 'playing'}
               color={COLOR_HEX[game.currentColor]}
@@ -661,11 +664,14 @@ function Seat({
   onTarget,
   labels,
   offline,
+  discordId,
 }: {
   labels: RefObject<HTMLElement>;
   player: GameView['players'][number];
   /** 斷線中，機器人代打 */
   offline: boolean;
+  /** 用來看他有沒有在語音頻道裡說話（不是 Discord 的人沒有） */
+  discordId: string | null | undefined;
   pos: THREE.Vector3;
   active: boolean;
   color: string;
@@ -677,6 +683,8 @@ function Seat({
 }) {
   const ring = useRef<THREE.MeshBasicMaterial>(null!);
   const fan = useRef<THREE.Group>(null!);
+  // 自己訂閱：有人開口時只重畫這個座位，不會整個場景跟著重畫
+  const speaking = useIsSpeaking(discordId);
   const backMat = useMemo(() => new THREE.MeshStandardMaterial({ map: backTexture(), roughness: 0.4, alphaTest: 0.5, side: THREE.DoubleSide }), []);
   const n = player.out ? 0 : Math.min(player.handCount, 14);
 
@@ -706,11 +714,12 @@ function Seat({
       </group>
       <Html portal={labels} position={[0, 1.9, -0.7]} center zIndexRange={[20, 0]}>
         <div
-          className={`seat3d ${active ? 'active' : ''} ${player.out ? 'out' : ''} ${offline && !player.out ? 'bot' : ''} ${canTarget ? 'targetable' : ''}`}
+          className={`seat3d ${active ? 'active' : ''} ${player.out ? 'out' : ''} ${offline && !player.out ? 'bot' : ''} ${canTarget ? 'targetable' : ''} ${speaking ? 'speaking' : ''}`}
         >
           <div className="seat-face">
             <Avatar name={player.name} src={player.avatar} />
             {offline && !player.out && <RobotIcon className="bot-badge" aria-label="機器人代打中" />}
+            {speaking && <MicIcon className="speaking-badge" aria-label="正在說話" />}
           </div>
           <div className="seat-name">{player.name}</div>
           <div className="seat-count">

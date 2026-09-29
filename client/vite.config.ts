@@ -36,6 +36,14 @@ export default defineConfig({
     allowedHosts: true,
     proxy: {
       '/api': 'http://localhost:4567',
+      // 真的在 Discord 裡跑的時候，/.proxy 是 Discord 客戶端提供的（URL Mapping 指到你的伺服器）。
+      // 本機用 mock-discord.html 測試時沒有那一層，所以在這裡補一個一樣的轉發；
+      // 開發模式的連線網址會多一段 /colyseus，一起吃掉。
+      '/.proxy': {
+        target: 'http://localhost:4567',
+        ws: true,
+        rewrite: (path) => path.replace(/^\/\.proxy(\/colyseus)?/, ''),
+      },
       '/colyseus': {
         target: 'http://localhost:4567',
         ws: true,

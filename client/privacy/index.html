@@ -39,14 +39,14 @@
           </div>
           <div>
             <h1>隱私權政策</h1>
-            <div class="date">生效日期：2026 年 9 月 28 日</div>
+            <div class="date">生效日期：2026 年 9 月 29 日</div>
           </div>
         </div>
 
         <div class="tldr">
           <div>
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4" /><path d="M4 21a8 8 0 0116 0" /></svg>
-            <span>只拿你的 Discord 名字、頭像和使用者 ID，用來在牌桌上顯示你、斷線時認出你。</span>
+            <span>必要的只有你的 Discord 名字、頭像和使用者 ID，用來在牌桌上顯示你、斷線時認出你。其他權限都是選擇性的。</span>
           </div>
           <div>
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></svg>
@@ -70,7 +70,17 @@
           <ul>
             <li>
               <strong>Discord 帳號資料</strong>：在 Discord 裡開啟本遊戲時，會請你授權 <code>identify</code> 權限，我們因此取得你的 Discord
-              使用者 ID、使用者名稱、顯示名稱和頭像。我們<strong>拿不到</strong>你的 email、密碼、好友名單、訊息或伺服器列表。
+              使用者 ID、使用者名稱、顯示名稱和頭像。這是唯一必要的權限。我們<strong>拿不到</strong>你的 email、密碼、好友名單或訊息。
+            </li>
+            <li>
+              <strong>選擇性的 Discord 權限</strong>：授權視窗也會列出下面三項，用來開啟額外功能。你不同意的話照樣能玩，只是對應的功能會關掉：
+              <ul>
+                <li>
+                  <code>guilds</code>：讓 Discord 允許本遊戲讀取你所在語音頻道的成員名稱和頭像，在大廳列出「在語音頻道裡還沒加入」的人。這個權限在技術上也能讀取你加入的伺服器列表，但本遊戲<strong>不會</strong>讀取或保存它。
+                </li>
+                <li><code>rpc.activities.write</code>：在你的 Discord 個人檔案上顯示遊戲狀態（Rich Presence），例如「打牌中、手上還有 5 張」。</li>
+                <li><code>rpc.voice.read</code>：知道語音頻道裡誰正在說話，在牌桌上亮起麥克風。本遊戲只知道「有沒有在說話」，聽不到、也不會錄下任何聲音。</li>
+              </ul>
             </li>
             <li><strong>遊戲資料</strong>：你所在的房間、座位、手牌、出的牌、是否喊了 LAST!、連線狀態等，遊戲進行時需要的資料。</li>
             <li><strong>瀏覽器直接開的時候</strong>：你輸入的名字。</li>
@@ -85,6 +95,8 @@
           <ul>
             <li>在牌桌上顯示你的名字和頭像。</li>
             <li>你斷線或重新開啟時，用 Discord 使用者 ID 認出你，把原本的座位和手牌還給你；你離線期間由電腦代打。</li>
+            <li>你加入房間時，伺服器用你的存取權杖向 Discord 確認你的使用者 ID，避免別人冒充你拿走座位。</li>
+            <li>你有同意選擇性權限的話：列出語音頻道裡的成員、顯示誰在說話、更新你的 Rich Presence（見第 2 點）。</li>
             <li>讓遊戲運作：發牌、判斷規則、把畫面同步給同桌的人。</li>
             <li>找出和修正錯誤。</li>
           </ul>
@@ -95,7 +107,8 @@
           <h2><span class="n">4</span>資料放多久</h2>
           <ul>
             <li>遊戲資料只存在伺服器的記憶體，不寫進資料庫或檔案。房間裡所有人都離開約 5 分鐘後，房間和裡面的資料就會刪除；在大廳斷線超過 60 秒的座位也會移除。</li>
-            <li>Discord 登入用的存取權杖（access token）只經過伺服器轉交給你的裝置，伺服器不會保存。</li>
+            <li>Discord 登入用的存取權杖（access token）只經過伺服器轉交給你的裝置；你加入房間時，伺服器會再用它向 Discord 確認一次你是誰，用完就丟，不會保存。</li>
+            <li>語音頻道成員的名稱和頭像只在你的裝置上讀取和顯示，不會傳到伺服器。</li>
             <li>伺服器記錄檔只用來除錯，不會長期保存。</li>
           </ul>
         </section>
@@ -116,7 +129,10 @@
 
         <section class="block reveal">
           <h2><span class="n">6</span>同桌的人看得到什麼</h2>
-          <p>同一桌的玩家看得到你的顯示名稱、頭像、手牌張數、你打出的牌、有沒有喊 LAST!，以及你是否在線。其他人看不到你手牌的內容。</p>
+          <p>
+            同一桌的玩家看得到你的顯示名稱、頭像、手牌張數、你打出的牌、有沒有喊 LAST!，以及你是否在線。其他人看不到你手牌的內容。在 Discord 裡玩的時候，同桌玩家的裝置也會收到你的 Discord 使用者 ID，用來把語音頻道裡的說話狀態對到你的座位上。
+          </p>
+          <p>在大廳裡，同一個語音頻道的人會看到彼此的名稱和頭像（包括還沒開啟本遊戲的人），這些資訊本來就顯示在 Discord 的語音頻道裡。</p>
         </section>
 
         <section class="block reveal">
@@ -161,14 +177,14 @@
           </div>
           <div>
             <h1>Privacy Policy</h1>
-            <div class="date">Effective: September 28, 2026</div>
+            <div class="date">Effective: September 29, 2026</div>
           </div>
         </div>
 
         <div class="tldr">
           <div>
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4" /><path d="M4 21a8 8 0 0116 0" /></svg>
-            <span>We only get your Discord name, avatar and user ID — to show you at the table and recognize you when you reconnect.</span>
+            <span>The only required data is your Discord name, avatar and user ID — to show you at the table and recognize you when you reconnect. Every other permission is optional.</span>
           </div>
           <div>
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></svg>
@@ -192,7 +208,17 @@
           <ul>
             <li>
               <strong>Discord account data</strong>: when you open the Game in Discord, we ask for the <code>identify</code> permission, which gives us your Discord user ID,
-              username, display name and avatar. We do <strong>not</strong> get your email, password, friends list, messages or server list.
+              username, display name and avatar. This is the only required permission. We do <strong>not</strong> get your email, password, friends list or messages.
+            </li>
+            <li>
+              <strong>Optional Discord permissions</strong>: the consent screen also lists the three permissions below, which turn on extra features. If you decline them you can still play; only that feature is turned off:
+              <ul>
+                <li>
+                  <code>guilds</code>: lets Discord allow the Game to read the names and avatars of the members of your current voice channel, so the lobby can list people who are in the voice channel but haven’t joined yet. Technically this permission could also read the list of servers you are in, but the Game does <strong>not</strong> read or store it.
+                </li>
+                <li><code>rpc.activities.write</code>: shows your game status on your Discord profile (Rich Presence), for example “Playing, 5 cards left”.</li>
+                <li><code>rpc.voice.read</code>: tells the Game who in the voice channel is speaking, so a microphone lights up at the table. The Game only knows <em>whether</em> someone is speaking; it cannot hear or record any audio.</li>
+              </ul>
             </li>
             <li><strong>Game data</strong>: your room, seat, hand, cards played, LAST! calls and connection status — what the game needs while it is running.</li>
             <li><strong>When playing in a browser</strong>: the name you type in.</li>
@@ -207,6 +233,8 @@
           <ul>
             <li>To show your name and avatar at the table.</li>
             <li>To recognize you by your Discord user ID when you disconnect or reopen the Game, and give you back your seat and cards. While you are offline, the computer plays for you.</li>
+            <li>When you join a room, the server uses your access token to confirm your user ID with Discord, so nobody else can pretend to be you and take your seat.</li>
+            <li>If you granted the optional permissions: to list the members of your voice channel, show who is speaking, and update your Rich Presence (see section 2).</li>
             <li>To run the game: dealing cards, enforcing the rules and keeping everyone’s screen in sync.</li>
             <li>To find and fix bugs.</li>
           </ul>
@@ -217,7 +245,8 @@
           <h2><span class="n">4</span>How long we keep it</h2>
           <ul>
             <li>Game data is kept only in server memory — never in a database or file. About 5 minutes after everyone has left a room, the room and all its data are deleted. Seats that stay disconnected in the lobby for more than 60 seconds are removed.</li>
-            <li>The Discord access token used to sign you in only passes through the server on its way to your device. The server does not store it.</li>
+            <li>The Discord access token used to sign you in passes through the server on its way to your device. When you join a room, the server uses it once more to confirm who you are with Discord, then discards it. The server does not store it.</li>
+            <li>The names and avatars of voice channel members are read and shown only on your device. They are never sent to the server.</li>
             <li>Server logs are used only for debugging and are not kept long term.</li>
           </ul>
         </section>
@@ -238,7 +267,10 @@
 
         <section class="block reveal">
           <h2><span class="n">6</span>What other players can see</h2>
-          <p>Players at your table can see your display name, avatar, how many cards you hold, the cards you play, whether you called LAST!, and whether you are online. They cannot see what cards are in your hand.</p>
+          <p>
+            Players at your table can see your display name, avatar, how many cards you hold, the cards you play, whether you called LAST!, and whether you are online. They cannot see what cards are in your hand. When playing in Discord, your tablemates’ devices also receive your Discord user ID, which is used to match who is speaking in the voice channel to your seat.
+          </p>
+          <p>In the lobby, people in the same voice channel see each other’s names and avatars (including people who haven’t opened the Game yet). This is the same information Discord already shows in the voice channel.</p>
         </section>
 
         <section class="block reveal">
