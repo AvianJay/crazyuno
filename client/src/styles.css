@@ -369,6 +369,8 @@ svg {
   position: relative;
   height: 100%;
   overflow: hidden;
+  /* 以扣除安全區域後的實際寬度決定大廳控制項的欄數 */
+  container: lobby / inline-size;
   background:
     radial-gradient(circle at 20% 10%, rgba(255, 79, 216, 0.16), transparent 40%),
     radial-gradient(circle at 85% 90%, rgba(62, 224, 255, 0.14), transparent 40%);
@@ -670,19 +672,32 @@ svg {
 }
 
 .steppers {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(4, max-content);
   justify-content: center;
-  gap: 12px;
+  gap: 8px;
 }
 
 .stepper {
   display: flex;
   align-items: center;
-  gap: 8px;
+  justify-content: center;
+  gap: 6px;
   background: rgba(255, 255, 255, 0.07);
   border-radius: 999px;
-  padding: 6px 10px;
+  padding: 6px;
+}
+
+@container lobby (max-width: 700px) {
+  .steppers {
+    grid-template-columns: repeat(2, max-content);
+  }
+}
+
+@container lobby (max-width: 380px) {
+  .steppers {
+    grid-template-columns: max-content;
+  }
 }
 
 .stepper-icon {
