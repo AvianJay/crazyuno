@@ -107,8 +107,12 @@
             };
           case 'GET_CHANNEL_PERMISSIONS':
             return { permissions: mode === 'noperm' ? '0' : '1' };
-          case 'SET_ACTIVITY':
+          case 'SET_ACTIVITY': {
+            // 跟真的 Discord 一樣：欄位填 null 會整個被退回（例如 timestamps: null → "timestamps" must be an object）
+            const bad = Object.keys(args?.activity ?? {}).find((k) => args.activity[k] === null);
+            if (bad) throw { code: 4000, message: `child "activity" fails because [child "${bad}" fails because ["${bad}" must be an object]]` };
             return { type: 0, name: 'MadCards', details: args?.activity?.details ?? null, state: args?.activity?.state ?? null };
+          }
           case 'OPEN_INVITE_DIALOG':
             // DM 或沒有權限時 Discord 會丟 INVALID_PERMISSIONS / INVALID_CHANNEL
             if (mode === 'noperm') throw { code: 4006, message: 'Invalid permissions' };
@@ -148,6 +152,8 @@
           try {
             post(1, { cmd, data: respond(cmd, args, evt), evt: null, nonce });
           } catch (err) {
+            // 記在這次呼叫上，測試才分得出「有送」跟「送成功」
+            calls[calls.length - 1].error = err;
             post(1, { cmd, data: err, evt: 'ERROR', nonce });
           }
           return;

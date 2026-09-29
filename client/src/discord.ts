@@ -222,14 +222,16 @@ async function pushPresence(): Promise<void> {
   presenceBusy = true;
   try {
     await sdk.commands.setActivity({
+      // 沒有值的欄位要整個不帶：SDK 的型別說可以填 null，但 Discord 會退回
+      // （code 4000：`"timestamps" must be an object`）
       activity: next
         ? {
             type: 0, // 0 = Playing
             details: next.details,
-            state: next.state ?? null,
-            party: next.party ? { size: [...next.party] } : null,
-            timestamps: next.start ? { start: next.start } : null,
-            assets: RP_ASSET ? { large_image: RP_ASSET, large_text: 'MadCards' } : null,
+            ...(next.state && { state: next.state }),
+            ...(next.party && { party: { size: [...next.party] } }),
+            ...(next.start && { timestamps: { start: next.start } }),
+            ...(RP_ASSET && { assets: { large_image: RP_ASSET, large_text: 'MadCards' } }),
           }
         : null,
     });

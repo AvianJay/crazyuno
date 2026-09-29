@@ -77,9 +77,10 @@ try {
   // 座位上的 Discord id 是伺服器驗證過才有的：沒驗證過的話自己也會被列進去
   check('已經在座位上的人不會被列進去', !waiting.includes('MockUser'), `${JSON.stringify(waiting)}（失敗的話：伺服器有開 DISCORD_MOCK_AUTH=1 嗎？）`);
 
-  // Rich Presence 內容：在大廳應該寫「在大廳等大家進來」
-  const presence = await page.eval(`(() => { const c = window.__calls.filter(c => c.cmd === 'SET_ACTIVITY').pop(); return c?.args?.activity ?? null; })()`);
-  check('Rich Presence 有大廳狀態', presence?.details === '在大廳等大家進來', JSON.stringify(presence));
+  // Rich Presence 內容：在大廳應該寫「在大廳等大家進來」，而且 Discord 有收（欄位填 null 會被退回）
+  const presence = await page.eval(`(() => { const c = window.__calls.filter(c => c.cmd === 'SET_ACTIVITY').pop(); return c ? { activity: c.args?.activity ?? null, error: c.error ?? null } : null; })()`);
+  check('Rich Presence 有大廳狀態', presence?.activity?.details === '在大廳等大家進來', JSON.stringify(presence));
+  check('Rich Presence 沒被 Discord 退回', presence && !presence.error, JSON.stringify(presence?.error));
   await page.shot(join(OUT, 'discord-lobby.png'));
 
   // ---------- 2. 邀請好友（正常） ----------
