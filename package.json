@@ -12,7 +12,8 @@
     "e2e": "node scripts/e2e/play.mjs",
     "e2e:sfx": "node scripts/e2e/sfx.mjs",
     "e2e:rejoin": "node scripts/e2e/rejoin.mjs",
-    "e2e:discord": "node scripts/e2e/discord.mjs"
+    "e2e:discord": "node scripts/e2e/discord.mjs",
+    "e2e:layout": "node scripts/e2e/layout.mjs"
   },
   "devDependencies": {
     "concurrently": "^10.0.5",

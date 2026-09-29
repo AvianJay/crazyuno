@@ -215,11 +215,13 @@ svg {
   position: fixed;
   inset: 0;
   background: rgba(0, 0, 0, 0.55);
-  display: grid;
-  place-items: center;
   z-index: 40;
-  padding: calc(16px + var(--sait)) calc(16px + var(--sair)) calc(16px + var(--saib)) calc(16px + var(--sail));
   animation: fade-in 0.4s ease-out;
+}
+
+/* 結算卡放在沒被 Discord 蓋住、再留一點邊的範圍裡 */
+.overlay .overlay-fit {
+  inset: calc(16px + var(--sait)) calc(16px + var(--sair)) calc(16px + var(--saib)) calc(16px + var(--sail));
 }
 
 /* ---------- 背景飄的牌 ---------- */
@@ -256,13 +258,13 @@ svg {
 }
 
 .loader {
-  position: relative;
-  z-index: 1;
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 22px;
   padding: 16px;
+  /* 錯誤訊息照畫面寬度換行，太高才整個縮小（見 <Fit>） */
+  max-width: 100vw;
   text-align: center;
 }
 
@@ -376,34 +378,60 @@ svg {
   position: relative;
   height: 100%;
   overflow: hidden;
-  /* 以扣除安全區域後的實際寬度決定大廳控制項的欄數 */
-  container: lobby / inline-size;
+  /* 用扣掉安全區域之後的畫面比例，決定大廳排成橫的、方的還是直的 */
+  container: lobby / size;
   background:
     radial-gradient(circle at 20% 10%, rgba(255, 79, 216, 0.16), transparent 40%),
     radial-gradient(circle at 85% 90%, rgba(62, 224, 255, 0.14), transparent 40%);
 }
 
-.lobby {
-  position: relative;
+/* <Fit>：內容照設計大小排好，再用 --fit 等比例縮放、置中 */
+.fit {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+}
+
+.fit-inner {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: max-content;
+  translate: -50% -50%;
+  scale: var(--fit, 1);
+}
+
+/* 蓋在背景飄的牌上面 */
+.lobby-fit,
+.loader-fit {
   z-index: 1;
-  height: 100%;
-  overflow-y: auto;
-  padding: 20px 16px 40px;
-  max-width: 720px;
-  margin: 0 auto;
-  display: flex;
-  flex-direction: column;
-  align-items: stretch;
-  gap: 16px;
+}
+
+/*
+ * 大廳固定用設計寬度排版（橫 980 / 方 720 / 直 400），高度看內容，
+ * 再由 <Fit> 整個縮放塞進畫面：永遠一個畫面放得下，不會出現捲軸
+ */
+.lobby {
+  width: 980px;
+  padding: 14px 20px 10px;
+  display: grid;
+  grid-template-columns: 360px 1fr;
+  grid-template-areas:
+    'title title'
+    'seats deck'
+    'start settings'
+    'legal legal';
+  gap: 14px 16px;
 }
 
 .title {
+  grid-area: title;
   display: flex;
   justify-content: center;
   align-items: center;
   gap: 14px;
   font-size: 2.9rem;
-  margin: 6px 0;
+  margin: 0;
   animation: drop-in 0.7s var(--bounce);
 }
 
@@ -436,12 +464,22 @@ svg {
 }
 
 .panel {
+  /* 怪牌的說明框以整個面板定位 */
+  position: relative;
   background: var(--panel);
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 18px;
   padding: 14px 16px;
   animation: rise-in 0.6s var(--bounce) both;
   animation-delay: calc(0.15s + var(--i) * 0.12s);
+}
+
+.seats-panel {
+  grid-area: seats;
+}
+
+.deck-panel {
+  grid-area: deck;
 }
 
 .panel-head {
@@ -472,13 +510,16 @@ svg {
   font-size: 1rem;
 }
 
+/* 一排五個（最多十個人 = 兩排） */
 .seats {
   list-style: none;
-  margin: 0;
+  margin: 0 auto;
   padding: 0;
+  max-width: 310px;
   display: flex;
   flex-wrap: wrap;
-  gap: 14px;
+  justify-content: center;
+  gap: 10px;
 }
 
 .seats li {
@@ -486,7 +527,7 @@ svg {
   flex-direction: column;
   align-items: center;
   gap: 4px;
-  width: 64px;
+  width: 54px;
   animation: pop-in 0.5s var(--bounce) both;
   animation-delay: calc(0.3s + var(--i, 0) * 0.08s);
 }
@@ -503,9 +544,9 @@ svg {
 }
 
 .seat-avatar .avatar {
-  width: 52px;
-  height: 52px;
-  font-size: 1.3rem;
+  width: 48px;
+  height: 48px;
+  font-size: 1.2rem;
   border: 3px solid rgba(255, 255, 255, 0.2);
 }
 
@@ -527,7 +568,7 @@ svg {
 
 .seat-label {
   font-size: 0.75rem;
-  max-width: 64px;
+  max-width: 54px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -535,8 +576,8 @@ svg {
 }
 
 .empty-seat .seat-avatar {
-  width: 52px;
-  height: 52px;
+  width: 48px;
+  height: 48px;
   border-radius: 50%;
   border: 3px dashed rgba(255, 255, 255, 0.35);
   font-size: 1.4rem;
@@ -544,16 +585,17 @@ svg {
   animation: breathe 1.4s ease-in-out infinite;
 }
 
-/* 怪牌：開 = 牌面朝上會發光，關 = 翻到背面 */
-.crazy-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(84px, 1fr));
-  gap: 12px;
+/* 怪牌 + 0/7 規則一排：開 = 牌面朝上會發光，關 = 翻到背面 */
+.deck-grid {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
 }
 
 .crazy-card,
 .rule-card {
-  position: relative;
+  flex: 1 1 0;
+  min-width: 0;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -561,8 +603,32 @@ svg {
   background: none;
   border: none;
   padding: 4px 0;
-  animation: pop-in 0.5s var(--bounce) both;
+  /* backwards：放完就把 transform 拿掉，說明框才會以整個面板定位（不然會以這張牌定位、超出畫面） */
+  animation: pop-in 0.5s var(--bounce) backwards;
   animation-delay: calc(0.4s + var(--i) * 0.07s);
+}
+
+/* 怪牌和規則中間的分隔：⇄ 下面拉一條線 */
+.deck-divider {
+  flex: none;
+  align-self: stretch;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding-top: 4px;
+  font-size: 1rem;
+  color: var(--cyan);
+  filter: drop-shadow(0 0 6px var(--cyan));
+  animation: fade-in 0.5s ease-out 0.7s backwards;
+}
+
+.deck-divider::after {
+  content: '';
+  flex: 1;
+  width: 2px;
+  border-radius: 2px;
+  background: linear-gradient(rgba(62, 224, 255, 0.6), transparent);
 }
 
 .flip {
@@ -570,29 +636,41 @@ svg {
   width: 72px;
   aspect-ratio: 2 / 3;
   transform-style: preserve-3d;
-  transition:
-    transform 0.6s var(--bounce),
-    filter 0.3s;
-  transform: rotateY(180deg);
+  /* 透視寫在 transform 裡：寫成外層的 perspective 屬性，外層會變成說明框的定位基準 */
+  transform: perspective(420px) rotateY(180deg);
+  transition: transform 0.6s var(--bounce);
+}
+
+.crazy-card.on .flip,
+.rule-card.on .flip {
+  transform: perspective(420px) rotateY(0);
+  animation: hover-card 2.4s ease-in-out infinite;
 }
 
 .crazy-card.on .flip {
-  transform: rotateY(0);
-  filter: drop-shadow(0 0 10px rgba(255, 79, 216, 0.8));
-  animation: hover-card 2.4s ease-in-out infinite;
   animation-delay: calc(var(--i) * 0.3s);
+}
+
+/*
+ * 發光加在牌面上，不能加在 .flip：filter 會把 preserve-3d 壓平，
+ * 背面藏不起來，翻到一半會看到左右相反的牌面、翻完才突然跳成牌背
+ */
+.flip .front {
+  transition: filter 0.3s;
+}
+
+.crazy-card.on .front {
+  filter: drop-shadow(0 0 10px rgba(255, 79, 216, 0.8));
+}
+
+/* 規則：牌面是兩張疊在一起的牌，開的時候發藍光 */
+.rule-card.on .front {
+  filter: drop-shadow(0 0 10px rgba(62, 224, 255, 0.85));
 }
 
 .crazy-card:not(:disabled):hover .flip,
 .rule-card:not(:disabled):hover .flip {
   scale: 1.08;
-}
-
-/* 規則：牌面是兩張疊在一起的牌，開的時候發藍光 */
-.rule-card.on .flip {
-  transform: rotateY(0);
-  filter: drop-shadow(0 0 10px rgba(62, 224, 255, 0.85));
-  animation: hover-card 2.4s ease-in-out infinite;
 }
 
 .flip .pair {
@@ -620,11 +698,6 @@ svg {
   rotate: 8deg;
 }
 
-.panel-head .rules-icon {
-  color: var(--cyan);
-  filter: drop-shadow(0 0 6px var(--cyan));
-}
-
 .flip img {
   position: absolute;
   inset: 0;
@@ -639,8 +712,10 @@ svg {
 }
 
 .crazy-name {
+  max-width: 100%;
   font-size: 0.8rem;
   font-weight: bold;
+  white-space: nowrap;
   color: var(--muted);
   transition: color 0.3s;
 }
@@ -650,38 +725,45 @@ svg {
   color: var(--ink);
 }
 
-/* 說明只在滑鼠移上去時冒出來 */
+/* 說明：滑鼠移上去（手機點一下）才蓋在面板上緣冒出來，寬度跟著面板，不會跑出畫面 */
 .crazy-desc {
   position: absolute;
-  bottom: calc(100% - 4px);
-  left: 50%;
-  width: 180px;
-  translate: -50% 0;
-  background: rgba(0, 0, 0, 0.9);
+  top: 8px;
+  left: 10px;
+  right: 10px;
+  background: rgba(0, 0, 0, 0.92);
   border: 1px solid rgba(255, 255, 255, 0.2);
-  padding: 8px 10px;
-  border-radius: 10px;
-  font-size: 0.75rem;
-  line-height: 1.4;
+  padding: 7px 12px;
+  border-radius: 12px;
+  font-size: 0.78rem;
+  line-height: 1.45;
+  text-align: left;
   pointer-events: none;
   opacity: 0;
-  scale: 0.8;
+  translate: 0 -6px;
   transition:
     opacity 0.2s,
-    scale 0.2s var(--bounce);
+    translate 0.2s var(--bounce);
   z-index: 5;
+}
+
+.crazy-desc b {
+  margin-right: 8px;
+  color: var(--yellow);
 }
 
 .crazy-card:hover .crazy-desc,
 .rule-card:hover .crazy-desc {
   opacity: 1;
-  scale: 1;
+  translate: 0 0;
 }
 
 .steppers {
+  grid-area: settings;
   display: grid;
-  grid-template-columns: repeat(4, max-content);
+  grid-template-columns: repeat(2, max-content);
   justify-content: center;
+  align-content: center;
   gap: 8px;
 }
 
@@ -693,18 +775,6 @@ svg {
   background: rgba(255, 255, 255, 0.07);
   border-radius: 999px;
   padding: 6px;
-}
-
-@container lobby (max-width: 700px) {
-  .steppers {
-    grid-template-columns: repeat(2, max-content);
-  }
-}
-
-@container lobby (max-width: 380px) {
-  .steppers {
-    grid-template-columns: max-content;
-  }
 }
 
 .stepper-icon {
@@ -751,8 +821,14 @@ svg {
   opacity: 0.3;
 }
 
+/* 開始按鈕（不是房主就是「等房主」） */
+.start-area {
+  grid-area: start;
+  display: grid;
+  place-items: center;
+}
+
 .start-btn {
-  align-self: center;
   position: relative;
   width: 96px;
   height: 96px;
@@ -793,7 +869,6 @@ svg {
 }
 
 .waiting {
-  align-self: center;
   display: flex;
   align-items: center;
   gap: 12px;
@@ -809,11 +884,10 @@ svg {
 
 /* 大廳底下的隱私權、服務條款 */
 .legal-links {
+  grid-area: legal;
   display: flex;
   justify-content: center;
   gap: 8px;
-  margin-top: auto;
-  padding-top: 8px;
   animation: fade-in 0.6s ease-out 0.9s both;
 }
 
@@ -835,6 +909,68 @@ svg {
 .legal-links button:hover {
   color: var(--ink);
   border-color: rgba(255, 255, 255, 0.35);
+}
+
+/* 方一點的畫面（iPad 直放、方形視窗）：一排一個面板，設定跟開始按鈕並排 */
+@container lobby (max-aspect-ratio: 27/20) {
+  .lobby {
+    width: 720px;
+    grid-template-columns: 1fr auto;
+    grid-template-areas:
+      'title title'
+      'seats seats'
+      'deck deck'
+      'settings start'
+      'legal legal';
+  }
+
+  /* 十個人一排放得下 */
+  .seats {
+    max-width: none;
+  }
+
+  .start-area {
+    padding: 0 24px;
+  }
+}
+
+/* 直的手機：整個縮成窄的一欄，六張牌還是排成一排 */
+@container lobby (max-aspect-ratio: 9/10) {
+  .lobby {
+    width: 400px;
+    padding: 12px 14px 8px;
+    grid-template-columns: 1fr;
+    grid-template-areas: 'title' 'seats' 'deck' 'settings' 'start' 'legal';
+    gap: 12px;
+  }
+
+  .title {
+    font-size: 2.3rem;
+  }
+
+  .panel {
+    padding: 12px;
+  }
+
+  .seats {
+    max-width: 310px;
+  }
+
+  .deck-grid {
+    gap: 5px;
+  }
+
+  .flip {
+    width: 46px;
+  }
+
+  .crazy-name {
+    font-size: 0.7rem;
+  }
+
+  .start-area {
+    padding: 0;
+  }
 }
 
 .legal-modal {
@@ -892,22 +1028,22 @@ svg {
   opacity: 0.5;
 }
 
-/* 大廳裡掛在座位面板底下，置中 */
+/* 大廳裡放在座位面板的標題列最右邊 */
 .lobby-invite {
-  width: 44px;
-  height: 44px;
+  width: 36px;
+  height: 36px;
   border-radius: 50%;
   border: 2px solid rgba(255, 255, 255, 0.3);
   background: rgba(0, 0, 0, 0.45);
   display: grid;
   place-items: center;
-  font-size: 1.25rem;
+  font-size: 1.1rem;
   color: var(--ink);
   transition:
     transform 0.15s var(--bounce),
     border-color 0.2s,
     background 0.2s;
-  margin: 14px auto 0;
+  margin: -6px 0 -6px auto;
 }
 
 .lobby-invite:hover:not(:disabled) {
@@ -936,8 +1072,8 @@ svg {
 
 /* 語音頻道裡還沒加入的人 */
 .voice-waiting {
-  margin-top: 14px;
-  padding-top: 12px;
+  margin-top: 12px;
+  padding-top: 10px;
   border-top: 1px dashed rgba(255, 255, 255, 0.15);
   animation: fade-in 0.5s ease-out;
 }
@@ -1489,6 +1625,37 @@ svg {
   animation: number-pop 0.3s var(--bounce);
 }
 
+.seat-info {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+}
+
+/* 矮的畫面（手機橫放、Discord 小視窗）：名牌改成橫的一條，讓開上方膠囊之後才不會壓到桌子中間 */
+@media (max-height: 520px) {
+  .seat3d {
+    flex-direction: row;
+    gap: 6px;
+    min-width: 0;
+    padding: 4px 10px 4px 4px;
+    border-radius: 999px;
+  }
+
+  .seat-info {
+    align-items: flex-start;
+  }
+
+  .seat-name {
+    max-width: 72px;
+  }
+
+  .seat3d .catch-btn,
+  .seat3d .swap-btn {
+    margin: 0 -4px 0 0;
+  }
+}
+
 .uno-badge {
   position: absolute;
   top: -8px;
@@ -1588,8 +1755,9 @@ svg {
 
 /* 選顏色：四個菱形（2×2 的方格轉 45 度），圍在打出去的牌旁邊 */
 .diamond-picker {
-  --s: clamp(46px, 9vmin, 70px);
-  --gap: clamp(62px, 13vmin, 104px);
+  /* 手機橫放很矮，照高度縮小，不然上下兩顆會壓到上方膠囊和手牌 */
+  --s: clamp(34px, min(12vw, 9vh), 70px);
+  --gap: clamp(46px, min(17vw, 13vh), 104px);
   display: grid;
   grid-template-columns: var(--s) var(--s);
   gap: var(--gap);
@@ -1778,10 +1946,6 @@ svg {
 /* ---------- 手機 ---------- */
 
 @media (max-width: 600px) {
-  .title {
-    font-size: 2.2rem;
-  }
-
   .turn-pill {
     height: 40px;
   }

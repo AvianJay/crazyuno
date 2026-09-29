@@ -15,6 +15,7 @@ import { chooseQuality, initialQuality, rememberAutoLow, type QualityState } fro
 import { Scene } from '../three/Scene';
 import { useOverheated } from '../useDiscord';
 import { Avatar } from './Avatar';
+import { Fit } from './Fit';
 import {
   ClockIcon,
   DeckIcon,
@@ -155,6 +156,11 @@ export function Table({ view, game, send }: { view: RoomView; game: GameView; se
     setPending({ ...pending, chosen: true });
   };
 
+  /** 點到空白的地方（或不能出的牌）：還沒選顏色、還沒選人的那張牌飛回手上 */
+  const cancelPending = () => {
+    if (pending && !pending.chosen) setPending(null);
+  };
+
   // 跑不動或顯示卡記憶體不夠：自動換成省電（玩家自己選過高畫質就尊重他，除非 WebGL 真的掛了）
   const onSlow = useCallback(() => {
     setQuality((q) => {
@@ -198,9 +204,7 @@ export function Table({ view, game, send }: { view: RoomView; game: GameView; se
         camera={{ fov: FOV, near: 0.1, far: 80, position: [0, 9, 8] }}
         // alpha: false = 不透明的畫布：手機合成畫面比較省，也不會有透明的一格露出後面的黑底
         gl={{ alpha: false, antialias: false, powerPreference: 'high-performance', stencil: false, toneMapping: THREE.NeutralToneMapping }}
-        onPointerMissed={() => {
-          if (pending && !pending.chosen) setPending(null);
-        }}
+        onPointerMissed={cancelPending}
       >
         <Scene
           view={view}
@@ -213,6 +217,7 @@ export function Table({ view, game, send }: { view: RoomView; game: GameView; se
           targeting={targeting}
           onPickTarget={pickTarget}
           onPlay={play}
+          onMiss={cancelPending}
           onDraw={() => {
             setPending(null);
             send('draw');
@@ -320,31 +325,34 @@ export function Table({ view, game, send }: { view: RoomView; game: GameView; se
 
       {game.phase === 'ended' && showResult && (
         <div className="overlay">
-          <div className="result">
-            <TrophyIcon className="trophy" />
-            {winner ? (
-              <div className="winner">
-                <div className="winner-avatar">
-                  <Avatar name={winner.name} src={winner.avatar} />
+          {/* 手機橫放時畫面很矮，整張結算卡等比例縮小塞進去 */}
+          <Fit className="overlay-fit">
+            <div className="result">
+              <TrophyIcon className="trophy" />
+              {winner ? (
+                <div className="winner">
+                  <div className="winner-avatar">
+                    <Avatar name={winner.name} src={winner.avatar} />
+                  </div>
+                  <div className="winner-name">{winner.id === view.you ? '你' : winner.name}</div>
                 </div>
-                <div className="winner-name">{winner.id === view.you ? '你' : winner.name}</div>
-              </div>
-            ) : (
-              <SkullIcon className="trophy" />
-            )}
-            {isHost ? (
-              <div className="result-actions">
-                <button className="round-btn big" onClick={() => send('start')} aria-label="再來一局">
-                  <ReplayIcon />
-                </button>
-                <button className="round-btn" onClick={() => send('lobby')} aria-label="回大廳改設定">
-                  <GearIcon />
-                </button>
-              </div>
-            ) : (
-              <HourglassIcon className="waiting-icon spin-slow" aria-label="等房主決定下一局" />
-            )}
-          </div>
+              ) : (
+                <SkullIcon className="trophy" />
+              )}
+              {isHost ? (
+                <div className="result-actions">
+                  <button className="round-btn big" onClick={() => send('start')} aria-label="再來一局">
+                    <ReplayIcon />
+                  </button>
+                  <button className="round-btn" onClick={() => send('lobby')} aria-label="回大廳改設定">
+                    <GearIcon />
+                  </button>
+                </div>
+              ) : (
+                <HourglassIcon className="waiting-icon spin-slow" aria-label="等房主決定下一局" />
+              )}
+            </div>
+          </Fit>
         </div>
       )}
     </div>

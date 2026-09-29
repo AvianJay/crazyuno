@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { CloseIcon, DocIcon, ShieldIcon } from './icons';
 
 type Page = 'privacy' | 'terms';
@@ -27,16 +28,19 @@ export function LegalLinks() {
           <DocIcon /> 服務條款
         </button>
       </div>
-      {page && (
-        <div className="legal-modal" onClick={() => setPage(null)}>
-          <div className="legal-frame" onClick={(e) => e.stopPropagation()}>
-            <iframe src={`/${page}/?embed=1`} title={page === 'privacy' ? '隱私權政策' : '服務條款'} />
-            <button className="legal-close" onClick={() => setPage(null)} aria-label="關閉">
-              <CloseIcon />
-            </button>
-          </div>
-        </div>
-      )}
+      {/* 掛到 body：大廳整個被 <Fit> 縮放，fixed 放在裡面會跟著縮、蓋不滿畫面 */}
+      {page &&
+        createPortal(
+          <div className="legal-modal" onClick={() => setPage(null)}>
+            <div className="legal-frame" onClick={(e) => e.stopPropagation()}>
+              <iframe src={`/${page}/?embed=1`} title={page === 'privacy' ? '隱私權政策' : '服務條款'} />
+              <button className="legal-close" onClick={() => setPage(null)} aria-label="關閉">
+                <CloseIcon />
+              </button>
+            </div>
+          </div>,
+          document.body,
+        )}
     </>
   );
 }

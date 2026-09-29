@@ -323,6 +323,12 @@ html.embed body {
   background: #0d1a14;
 }
 
+/* 視窗裡的長文要捲，捲軸換成細細的、跟遊戲同色系，不要系統那條灰的 */
+html.embed {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(62, 224, 255, 0.45) transparent;
+}
+
 html.embed .floaters,
 html.embed .logo {
   display: none;

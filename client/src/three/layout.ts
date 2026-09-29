@@ -87,6 +87,34 @@ export function seatMap(game: GameView, you: string, aspect: number): Map<string
   return map;
 }
 
+/** 上方中間「輪到誰」膠囊（和下面的整局倒數）一半的寬度，px */
+const HUD_HALF_W = 64;
+const tmpV = new THREE.Vector3();
+
+/**
+ * 對手名牌（drei 的 Html）在畫面上的中心：照 3D 座標投影，但整塊名牌不能跑出畫面，
+ * 也不能躲到上方中間「輪到誰」膠囊的後面 —— 正對面的座位在橫的螢幕上剛好在那裡，
+ * 被蓋住就點不到他身上的換牌、抓人按鈕。
+ *
+ * box 是名牌沒縮放時的大小（輪到他會放大 1.12 倍），hudTop 是膠囊（有整局倒數就是倒數）的下緣，px。
+ */
+export function seatLabelPosition(
+  el: THREE.Object3D,
+  camera: THREE.Camera,
+  size: { width: number; height: number },
+  box: { w: number; h: number },
+  hudTop: number,
+): [number, number] {
+  const p = tmpV.setFromMatrixPosition(el.matrixWorld).project(camera);
+  const hw = box.w * 0.56 + 4;
+  const hh = box.h * 0.56 + 4;
+  const x = THREE.MathUtils.clamp(((p.x + 1) / 2) * size.width, hw, Math.max(hw, size.width - hw));
+  // 左右跟膠囊重疊才要往下讓，旁邊的座位只要不超出畫面
+  const top = Math.abs(x - size.width / 2) < hw + HUD_HALF_W ? hudTop : 0;
+  const y = THREE.MathUtils.clamp(((1 - p.y) / 2) * size.height, top + hh, Math.max(top + hh, size.height - hh));
+  return [x, y];
+}
+
 export interface Slot {
   x: number;
   y: number;

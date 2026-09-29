@@ -1,6 +1,7 @@
 /**
  * 迷你的 Chrome DevTools Protocol 驅動程式，開無頭 Edge 來測試（不用裝套件，Node 22+ 內建 WebSocket）。
- * 用 SwiftShader 軟體算圖，所以 WebGL 能跑但很慢（每秒 1～6 格），截圖會比畫面慢一點。
+ * 預設用 SwiftShader 軟體算圖，所以 WebGL 能跑但很慢（每秒 1～6 格），截圖會比畫面慢一點。
+ * GPU=1 改用顯示卡（每秒 50 格上下），要測滑鼠 hover 這種即時反應就要開。
  */
 import { spawn } from 'node:child_process';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
@@ -47,11 +48,15 @@ function globToRegExp(pattern) {
 
 export async function launch({ port = 9333 } = {}) {
   const dir = mkdtempSync(join(tmpdir(), 'edge-cdp-'));
-  const proc = spawn(
-    EDGE,
-    ['--headless=new', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist', `--remote-debugging-port=${port}`, `--user-data-dir=${dir}`, '--no-first-run', 'about:blank'],
-    { stdio: 'ignore' },
-  );
+  const gl =
+    process.env.GPU === '1'
+      ? ['--use-angle=d3d11', '--enable-gpu', '--ignore-gpu-blocklist']
+      : ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'];
+  // 全新的使用者資料夾：Edge 會同步裝上一堆擴充功能、開歡迎頁、在背景更新元件，記憶體少的時候整個慢到截一張圖要好幾秒
+  const lean = ['--disable-extensions', '--disable-sync', '--disable-background-networking', '--disable-component-update', '--no-default-browser-check', '--renderer-process-limit=2'];
+  const proc = spawn(EDGE, ['--headless=new', ...gl, ...lean, `--remote-debugging-port=${port}`, `--user-data-dir=${dir}`, '--no-first-run', 'about:blank'], {
+    stdio: 'ignore',
+  });
   let version;
   for (let i = 0; i < 100 && !version; i++) {
     try {

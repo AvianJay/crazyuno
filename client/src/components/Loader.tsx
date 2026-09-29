@@ -2,6 +2,7 @@ import { COLORS, type Card } from '@crazyuno/shared';
 import { useEffect, useMemo, useState, type CSSProperties, type ReactNode } from 'react';
 import { backImage, faceImage } from '../cardFace';
 import { exitActivity, inDiscord } from '../discord';
+import { Fit } from './Fit';
 import { AlertIcon, ExitIcon, ReplayIcon } from './icons';
 
 /** 載入中：三張牌一直洗來洗去 */
@@ -9,19 +10,21 @@ export function Loader({ caption }: { caption?: string }) {
   return (
     <div className="loader-screen">
       <FloatingCards />
-      <div className="loader">
-        <div className="shuffle">
-          <img className="lc lc1" src={faceImage({ kind: 'number', color: 'red', value: 7 })} alt="" />
-          <img className="lc lc2" src={backImage()} alt="" />
-          <img className="lc lc3" src={faceImage({ kind: 'wild', color: null })} alt="" />
+      <Fit className="loader-fit">
+        <div className="loader">
+          <div className="shuffle">
+            <img className="lc lc1" src={faceImage({ kind: 'number', color: 'red', value: 7 })} alt="" />
+            <img className="lc lc2" src={backImage()} alt="" />
+            <img className="lc lc3" src={faceImage({ kind: 'wild', color: null })} alt="" />
+          </div>
+          <div className="dots">
+            {COLORS.map((c, i) => (
+              <span key={c} className={`dot ${c}`} style={{ animationDelay: `${i * 0.12}s` }} />
+            ))}
+          </div>
+          {caption && <div className="loader-caption">{caption}</div>}
         </div>
-        <div className="dots">
-          {COLORS.map((c, i) => (
-            <span key={c} className={`dot ${c}`} style={{ animationDelay: `${i * 0.12}s` }} />
-          ))}
-        </div>
-        {caption && <div className="loader-caption">{caption}</div>}
-      </div>
+      </Fit>
     </div>
   );
 }
@@ -31,17 +34,19 @@ export function ErrorScreen({ message }: { message: string }) {
   return (
     <div className="loader-screen">
       <FloatingCards />
-      <div className="loader error">
-        <div className="broken">
-          <img className="half left" src={backImage()} alt="" />
-          <img className="half right" src={backImage()} alt="" />
-          <AlertIcon className="broken-alert" />
+      <Fit className="loader-fit">
+        <div className="loader error">
+          <div className="broken">
+            <img className="half left" src={backImage()} alt="" />
+            <img className="half right" src={backImage()} alt="" />
+            <AlertIcon className="broken-alert" />
+          </div>
+          <div className="loader-caption">{message}</div>
+          <button className="round-btn" onClick={() => location.reload()} aria-label="重新整理">
+            <ReplayIcon />
+          </button>
         </div>
-        <div className="loader-caption">{message}</div>
-        <button className="round-btn" onClick={() => location.reload()} aria-label="重新整理">
-          <ReplayIcon />
-        </button>
-      </div>
+      </Fit>
     </div>
   );
 }
@@ -68,28 +73,30 @@ export function AuthScreen({ message, onRetry }: { message: string; onRetry?: ()
   return (
     <div className="loader-screen">
       <FloatingCards />
-      <div className="loader error auth">
-        <div className="broken">
-          <img className="half left" src={backImage()} alt="" />
-          <img className="half right" src={backImage()} alt="" />
-          <AlertIcon className="broken-alert" />
+      <Fit className="loader-fit">
+        <div className="loader error auth">
+          <div className="broken">
+            <img className="half left" src={backImage()} alt="" />
+            <img className="half right" src={backImage()} alt="" />
+            <AlertIcon className="broken-alert" />
+          </div>
+          <div className="auth-title">沒有完成 Discord 授權</div>
+          <div className="loader-caption">{message}</div>
+          {inDiscord && <div className="auth-countdown">{left} 秒後自動離開活動</div>}
+          <div className="auth-actions">
+            {onRetry && (
+              <button className="round-btn" onClick={onRetry} aria-label="重新授權">
+                <ReplayIcon />
+              </button>
+            )}
+            {inDiscord && (
+              <button className="auth-exit" onClick={() => exitActivity('使用者沒有完成授權')}>
+                <ExitIcon /> 馬上離開
+              </button>
+            )}
+          </div>
         </div>
-        <div className="auth-title">沒有完成 Discord 授權</div>
-        <div className="loader-caption">{message}</div>
-        {inDiscord && <div className="auth-countdown">{left} 秒後自動離開活動</div>}
-        <div className="auth-actions">
-          {onRetry && (
-            <button className="round-btn" onClick={onRetry} aria-label="重新授權">
-              <ReplayIcon />
-            </button>
-          )}
-          {inDiscord && (
-            <button className="auth-exit" onClick={() => exitActivity('使用者沒有完成授權')}>
-              <ExitIcon /> 馬上離開
-            </button>
-          )}
-        </div>
-      </div>
+      </Fit>
     </div>
   );
 }

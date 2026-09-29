@@ -3,7 +3,7 @@ import { Environment, Html, Lightformer, PerformanceMonitor, Sparkles } from '@r
 import { useFrame, useThree } from '@react-three/fiber';
 import { Bloom, ChromaticAberration, EffectComposer, ToneMapping, Vignette } from '@react-three/postprocessing';
 import { ToneMappingMode, type ChromaticAberrationEffect } from 'postprocessing';
-import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactElement, type RefObject } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactElement, type RefObject } from 'react';
 import * as THREE from 'three';
 import { Avatar } from '../components/Avatar';
 import { DeckIcon, MicIcon, RobotIcon, SirenIcon, SkullIcon, SwapIcon } from '../components/icons';
@@ -19,14 +19,17 @@ import {
   deckSlot,
   deckWorldPose,
   DISCARD,
+  FOV,
   handSlots,
   HAND_DIST,
   MY_SEAT,
   placeRig,
   rig,
+  seatLabelPosition,
   seatMap,
   TABLE_RX,
   TABLE_RZ,
+  type Slot,
 } from './layout';
 
 interface Props {
@@ -44,6 +47,8 @@ interface Props {
   targeting: boolean;
   onPickTarget(id: string): void;
   onPlay(card: Card): void;
+  /** 點到不能出的手牌：跟點空白的地方一樣（把選到一半的萬用牌收回來） */
+  onMiss(): void;
   onDraw(): void;
   onCatch(targetId: string): void;
   /** 3D 裡的 HTML 標籤掛在這個 div 上 */
@@ -63,6 +68,8 @@ export function Scene(props: Props) {
   const aspect = size.width / size.height;
   const seats = useMemo(() => seatMap(game, view.you, aspect), [game, view.you, aspect]);
   const myTurn = game.phase === 'playing' && game.turnId === view.you;
+  // 名牌要讓開上方中間的「輪到誰」膠囊（見 styles.css 的 .turn-pill、.game-clock），有整局倒數就再往下
+  const hudTop = view.gameMsLeft !== null && game.phase === 'playing' ? 92 : 60;
   // 第一格畫面之前就要知道鏡頭在哪，新牌才知道從哪裡飛出來
   if (!rig.ready) placeRig(aspect);
 
@@ -110,6 +117,7 @@ export function Scene(props: Props) {
             <Seat
               key={p.id}
               labels={labels}
+              hudTop={hudTop}
               player={p}
               offline={!seat?.connected}
               discordId={seat?.discordId}
@@ -427,6 +435,7 @@ function Cards({
   myTurn,
   pendingCard: pending,
   onPlay,
+  onMiss,
 }: Props & { seats: Map<string, THREE.Vector3>; myTurn: boolean }) {
   const size = useThree((s) => s.size);
   const discard = useRef<DiscardItem[]>([]);
@@ -498,6 +507,22 @@ function Cards({
   const localQ = new THREE.Quaternion();
   const flatQ = new THREE.Quaternion();
   const euler = new THREE.Euler();
+  /** 手牌的位置：可以出的微微浮起；滑鼠滑到的再浮高、轉正、放大、靠近鏡頭 */
+  const place = (out: Pose, slot: Slot, playable: boolean, hovered: boolean) => {
+    const lift = (playable ? 0.12 : 0) + (hovered ? 0.18 : 0);
+    let x = slot.x;
+    if (hovered) {
+      // 放大又靠近鏡頭，最旁邊那張會超出畫面被切掉：往中間推回來
+      const halfW = -(slot.z + 0.25) * Math.tan(THREE.MathUtils.degToRad(FOV / 2)) * aspect;
+      const edge = Math.max(0, halfW - (CARD_W * slot.scale * 1.15) / 2 - 0.02);
+      x = THREE.MathUtils.clamp(x, -edge, edge);
+    }
+    out.pos.set(x, slot.y + lift * slot.scale * 1.5, slot.z + (hovered ? 0.25 : 0));
+    out.pos.applyMatrix4(rig.base.matrixWorld);
+    euler.set(0, 0, hovered ? 0 : slot.rz);
+    out.quat.copy(rig.base.quaternion).multiply(localQ.setFromEuler(euler));
+    out.scale = slot.scale * (hovered ? 1.15 : 1);
+  };
   inHand.forEach((card, i) => {
     const slot = slots[i];
     const playable = game.playable.includes(card.id);
@@ -511,14 +536,9 @@ function Cards({
         glow={playable ? COLOR_HEX[card.color ?? game.currentColor] : null}
         dim={myTurn && !playable}
         onClick={playable ? () => onPlay(card) : undefined}
-        target={(out, hovered) => {
-          const lift = (playable ? 0.12 : 0) + (hovered ? 0.18 : 0);
-          out.pos.set(slot.x, slot.y + lift * slot.scale * 1.5, slot.z + (hovered ? 0.25 : 0));
-          out.pos.applyMatrix4(rig.base.matrixWorld);
-          euler.set(0, 0, hovered ? 0 : slot.rz);
-          out.quat.copy(rig.base.quaternion).multiply(localQ.setFromEuler(euler));
-          out.scale = slot.scale * (hovered ? 1.15 : 1);
-        }}
+        onBlockedClick={onMiss}
+        rest={(out) => place(out, slot, playable, false)}
+        target={(out, hovered) => place(out, slot, playable, hovered)}
       />,
     );
   });
@@ -663,10 +683,13 @@ function Seat({
   canTarget,
   onTarget,
   labels,
+  hudTop,
   offline,
   discordId,
 }: {
   labels: RefObject<HTMLElement>;
+  /** 上方「輪到誰」膠囊的下緣（px），名牌不能躲到它後面 */
+  hudTop: number;
   player: GameView['players'][number];
   /** 斷線中，機器人代打 */
   offline: boolean;
@@ -687,6 +710,22 @@ function Seat({
   const speaking = useIsSpeaking(discordId);
   const backMat = useMemo(() => new THREE.MeshStandardMaterial({ map: backTexture(), roughness: 0.4, alphaTest: 0.5, side: THREE.DoubleSide }), []);
   const n = player.out ? 0 : Math.min(player.handCount, 14);
+
+  // 名牌的大小（冒出換牌、抓人按鈕會變大），擺位置時整塊都要留在畫面裡
+  const box = useRef({ w: 80, h: 84 });
+  const measure = useCallback((node: HTMLDivElement | null) => {
+    if (!node) return;
+    const ro = new ResizeObserver(() => {
+      box.current = { w: node.offsetWidth, h: node.offsetHeight };
+    });
+    ro.observe(node);
+    return () => ro.disconnect();
+  }, []);
+  const place = useCallback(
+    (el: THREE.Object3D, camera: THREE.Camera, size: { width: number; height: number }) =>
+      seatLabelPosition(el, camera, size, box.current, hudTop),
+    [hudTop],
+  );
 
   useFrame((st, dt) => {
     const t = st.clock.elapsedTime;
@@ -712,8 +751,9 @@ function Seat({
           );
         })}
       </group>
-      <Html portal={labels} position={[0, 1.9, -0.7]} center zIndexRange={[20, 0]}>
+      <Html portal={labels} position={[0, 1.9, -0.7]} center zIndexRange={[20, 0]} calculatePosition={place}>
         <div
+          ref={measure}
           className={`seat3d ${active ? 'active' : ''} ${player.out ? 'out' : ''} ${offline && !player.out ? 'bot' : ''} ${canTarget ? 'targetable' : ''} ${speaking ? 'speaking' : ''}`}
         >
           <div className="seat-face">
@@ -721,15 +761,17 @@ function Seat({
             {offline && !player.out && <RobotIcon className="bot-badge" aria-label="機器人代打中" />}
             {speaking && <MicIcon className="speaking-badge" aria-label="正在說話" />}
           </div>
-          <div className="seat-name">{player.name}</div>
-          <div className="seat-count">
-            {player.out ? (
-              <SkullIcon />
-            ) : (
-              <>
-                <DeckIcon /> <span key={player.handCount}>{player.handCount}</span>
-              </>
-            )}
+          <div className="seat-info">
+            <div className="seat-name">{player.name}</div>
+            <div className="seat-count">
+              {player.out ? (
+                <SkullIcon />
+              ) : (
+                <>
+                  <DeckIcon /> <span key={player.handCount}>{player.handCount}</span>
+                </>
+              )}
+            </div>
           </div>
           {player.unoSafe && !player.out && <div className="uno-badge">LAST!</div>}
           {canCatch && !canTarget && (
