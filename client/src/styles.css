@@ -53,6 +53,13 @@ button {
   font: inherit;
   color: inherit;
   cursor: pointer;
+  /*
+   * iOS / iPadOS 的 WebKit 會替有原生外觀的按鈕硬塞左右各 1em 的 padding（蓋過我們寫的），
+   * 固定大小的圓按鈕內容寬度被擠到 0，icon 只能從左邊開始往右溢出。拿掉原生外觀就不會套
+   */
+  -webkit-appearance: none;
+  appearance: none;
+  padding: 0;
 }
 
 button:disabled {
